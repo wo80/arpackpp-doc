@@ -108,3 +108,9 @@
 % Table styles
 \renewcommand{\arraystretch}{1.5}
 \newcolumntype{L}{>{\ttfamily}l}
+
+% Enable hyphenation for typewriter font.
+\def\textvtt#{\bgroup\ttfamily\hyphenchar\font=45\relax\let\next=}
+%\DeclareTextFontCommand{\textvtt}{\ttfamily\hyphenchar\font=45\relax}
+\hyphenation{ARrc-Sym-Gen-Eig}
+\hyphenation{ARlu-Non-Sym-Std-Eig}

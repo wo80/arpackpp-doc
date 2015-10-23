@@ -156,9 +156,9 @@ It is easy to prove that $\nu$, the eigenvalues of largest magnitude of $OP=(A-\
 
 The major drawback of this mode is the necessity of evaluating the matrix-vector product $y \leftarrow OPx$, which means that a function that solves a linear systems involving $(A-\sigma I)$ must be available. This function is provided internally by \ARPP{} if \texttt{ARluSymStdEig} is being used, but it must be defined by the user when one of the \texttt{ARSymStdEig} or \texttt{ARrcSymStdEig} classes is employed.
 
-\subsection{Real symmetric generalized problems.}
+\subsection{Real symmetric generalized problems}
 \index{Computational modes!real symmetric generalized}
-\ARPP{} also provides three classes, named \texttt{ARSymGenEig}, \texttt{ARluSymGenEig} and \texttt{ARrcSymGenEig}, to solve symmetric real generalized problems in the form $Ax=Bx\lambda$. These classes include four different \textit{modes} that can be selected according to some problem characteristics 
+\ARPP{} also provides three classes, named \textvtt{ARSymGenEig}, \textvtt{ARluSymGenEig} and \textvtt{ARrcSymGenEig}, to solve symmetric real generalized problems in the form $Ax=Bx\lambda$. These classes include four different \textit{modes} that can be selected according to some problem characteristics 
 
 \paragraph{1. Regular mode.}
 As in the standard case, this mode is well suited to find eigenvalues with largest or smallest algebraic value or magnitude. Two matrix-vector products are performed (and must be supplied if \texttt{ARSymGenEig} or \texttt{ARrcSymGenEig} are being used) in this mode:
