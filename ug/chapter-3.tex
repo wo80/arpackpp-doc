@@ -1,0 +1,448 @@
+\chapter{ARPACK++ classes and functions}
+
+Due to algorithmic considerations concerning program efficiency and simplicity, \ARP{} FORTRAN code divides eigenvalue problems into three main categories: real symmetric, real nonsymmetric and complex. \ARP{} provides a separate FORTRAN subroutine for each one of these classes.
+
+In the c++ library, these categories are subdivided further. \ARPP{} makes a distinction between regular and generalized problems, due to the different number of matrices that characterize them, so there are six types of classes that can be used to define eigenvalue problems.
+
+By dividing problems this way, \ARPP{} assures that each type of problem belongs to a class with minimal template arguments, reducing the compilation time and the size of the programs. As a consequence, \ARPP{} has a large number of classes. On the other hand, the number of constructor parameters is small.
+
+Generally, the user will be asked to define a dense matrix or a matrix in compressed sparse column (CSC) or band format, or to supply a matrix-vector product $y\leftarrow OPx$ in order to describe the eigenvalue problem. The desired part of the spectrum must also be specified.
+
+\ARPP{} classes and their computational modes are briefly described below. Some of the problem characteristics that can be defined by parameters passed to constructors are also presented, along with a complete list of \ARPP{} functions. 
+
+\section{Eigenvalue problem classes}
+
+\ARP{} is an extensive package that supplies a variety of alternatives to handle different regular and generalized eigenvalue problems. Whenever possible, advantage is taken of special structure or characteristics such as the symmetry of involved matrices, the type of its elements (if they are real or complex) and the spectral transformation strategy used.
+
+In this section, \ARPP{} classes are divided into three levels according to the amount of information the user is required to supply. For example, if a sparse matrix is available, in the sense that its nonzero elements can be put in a vector, then one group of classes should be used. Another group of classes were made available for the case the user can supply only matrix-vector products. Finally, a third group should be used if the user wants to evaluate matrix-vector products by himself instead of passing them to \ARPP{} classes constructors.
+
+\ARPP{} classes are summarized below. Some examples that clarify their use will be presented in the next chapter, but the user must refer to the \ARPP{} \textit{reference guide} below for a complete description of them.
+
+\subsection{Classes that require matrices}
+
+The first and most versatile group of \ARPP{} classes is shown in the table below. These classes can be used to solve all kinds of eigenvalue problems as long as the nonzero elements of matrices can be stored in compressed sparse column or band format, or sequentially in a $n \cdot n$ vector if the matrix is dense.
+
+\begin{center}
+	\renewcommand{\arraystretch}{1.2}
+	$\begin{array}{@{}crl@{}}\toprule
+	\text{Type of matrix} & & \text{Class name} \\\midrule
+	\text{Real symmetric} & \text{standard:} & \texttt{ARluSymStdEig}\\
+	& \text{generalized:} & \texttt{ARluSymGenEig}\\\midrule
+	\text{Real nonsymmetric} & \text{standard:} & \texttt{ARluNonSymStdEig}\\
+	& \text{generalized:} & \texttt{ARluNonSymGenEig}\\\midrule
+	\text{Complex} & \text{standard:} & \texttt{ARluCompStdEig}\\
+	\text{(not Hermitian)} & \text{generalized:} & \texttt{ARluCompGenEig}\\\bottomrule
+	\end{array}$
+\end{center}
+
+Because classes of this group use \ARPP{} internal structure to perform matrix-vector products and solve linear systems (by direct methods), the kind of information that the user is supposed to supply is minimal: just an object that belongs to one of the matrix classes provided by \ARPP{} and the number of desired eigenvalues. A list of available matrix classes is given later in this chapter.
+
+\subsection{Classes that require user-defined matrix-vector products}
+
+This group includes classes that allow the user to define matrix-vector products when nonzero matrix elements cannot be passed directly to \ARPP{}. For each combination of matrix type, problem type and computational mode, there is a different set of such products that must be supplied, as it will be described in the \textit{Computational modes} section below.
+
+To allow these matrix-vector products to have the same number of parameters without preventing them from sharing information with other data structures, they must be declared as a member function of some specific matrix classes.
+
+\begin{center}
+	\renewcommand{\arraystretch}{1.2}
+	$\begin{array}{@{}crl@{}}\toprule
+	\text{Type of matrix} & & \text{Class name} \\\midrule
+	\text{Real symmetric} & \text{standard:} & \texttt{ARSymStdEig}\\
+	& \text{generalized:} & \texttt{ARSymGenEig}\\\midrule
+	\text{Real nonsymmetric} & \text{standard:} & \texttt{ARNonSymStdEig}\\
+	& \text{generalized:} & \texttt{ARNonSymGenEig}\\\midrule
+	\text{Complex} & \text{standard:} & \texttt{ARCompStdEig}\\
+	\text{(Hermitian or not)} & \text{generalized:} & \texttt{ARCompGenEig}\\\bottomrule
+	\end{array}$
+\end{center}
+
+These classes are also useful if the user wants to build an interface between \ARPP{} and some other library that contains matrix classes. An example on how to create such interface will be presented in chapter 5.
+
+\subsection{Reverse communication classes}
+
+These classes implement the so called \textit{reverse communication interface} (the interface provided by the \ARP{} FORTRAN code), and should be used only if the user wants to solve eigenvalue problems without passing any matrix information to \ARPP{}. In this case, the Arnoldi process is interrupted each time a matrix-vector product is required, so the user’s code can perform the product. 
+
+\begin{center}
+	\renewcommand{\arraystretch}{1.2}
+	$\begin{array}{@{}crl@{}}\toprule
+	\text{Type of matrix} & & \text{Class name} \\\midrule
+	\text{Real symmetric} & \text{standard:} & \texttt{ARrcSymStdEig}\\
+	& \text{generalized:} & \texttt{ARrcSymGenEig}\\\midrule
+	\text{Real nonsymmetric} & \text{standard:} & \texttt{ARrcNonSymStdEig}\\
+	& \text{generalized:} & \texttt{ARrcNonSymGenEig}\\\midrule
+	\text{Complex} & \text{standard:} & \texttt{ARrcCompStdEig}\\
+	\text{(Hermitian or not)} & \text{generalized:} & \texttt{ARrcCompGenEig}\\\bottomrule
+	\end{array}$
+\end{center}
+
+\subsection{Base classes}
+
+All of the above classes are derived from the lowest level base classes \texttt{ARStdEig}, \texttt{ARGenEig}, \texttt{ARrcStdEig} and \texttt{ARrcGenEig}. These classes contain the most fundamental \ARPP{} variables and functions and are not intended to be used directly. However, they can be useful if someone wants to build his own classes related to some specific problems.
+
+\section{Constructor parameters}
+
+Choosing one of the classes listed above is not the only requirement the user is supposed to meet when defining an eigenvalue problem. It is also necessary to provide information about the matrices that characterize the problem, to furnish the number of eigenvalues sought and to decide how to stop the Arnoldi method, for example.
+
+This additional information is usually supplied to \ARPP{} by passing parameters to the class constructor when objects are being declared. Although some class constructors include more parameters than others, most of them usually require the user to specify
+
+\begin{itemize}
+	\item the dimension of the eigenvalue problem, \texttt{n};
+	\item the number of eigenvalue to be computed, \texttt{nev};
+	\item one or two matrix objects, depending on whether a standard or a generalized problem is being solved.
+\end{itemize}
+
+These parameters are essential, which means that one cannot set up a problem without defining them. Various other parameters are usually defined internally by \ARPP{}, but the user may also supply them when calling the constructor. In this case, the default values are ignored. Among these optional parameters, the most important are:
+
+\begin{itemize}
+	\item \texttt{which}, the part of the spectrum that should be computed;
+	\item \texttt{ncv}, the number of Arnoldi vectors generated at each iteration of \ARP{};
+	\item \texttt{tol}, the relative accuracy to which eigenvalues are to be determined;
+	\item \texttt{maxit}, the maximum number of iterations allowed;
+	\item \texttt{resid}, a starting vector for the Arnoldi process.
+\end{itemize}	
+
+Passing parameters through class constructors, as described above, is a very common procedure in c++. It is also a common practice to define more than one constructor for each class, so the number of parameters required to define slightly different problems can be reduced to a minimum.
+
+In the \ARPP{} library, all classes\footnote{Except those classified as pure base classes.} contain at least four different constructors: a default constructor (with no parameters), a copy constructor (to build an eigenvalue problem from another), a constructor that defines a problem in regular mode and a another one to solve problems using the shift and invert mode spectral transformation. However, several classes contain more than these four constructors.
+
+The spectral transformations available for each class and the specific requirements related to them will be described later in this chapter. A detailed description of all \ARPP{} class parameters and constructors can be found in the appendix.
+
+\section{Matrix classes}
+
+Eigenvalue problems arising in real applications are frequently characterized by very large and sparse matrices. Usually, it is convenient to store such matrices in a dense vector, or using the compressed sparse column (CSC) or band format to efficiently perform the matrix-vector products or solve the linear systems required by the Arnoldi method. In such cases, the simplest way of defining a problem is to use one of the predefined matrix classes provided by \ARPP{}.
+
+\ARPP{} contains six classes that can be used to store sparse matrices, as shown in the following table. They are divided according to two parameters: the library that is used to solve linear systems and the presence of symmetry. Other two classes are provided for dense matrices. Real and complex data are handled by the same classes, since \ARPP{} uses templates to define them.
+
+This classification permits the user to supply only the minimum amount of information that is necessary to characterize a matrix. For example, only four parameters are required to create a real square nonsymmetric band matrix: its dimension, the upper and the lower bandwidth and a vector that contains the matrix elements that belong to the band. If the matrix is symmetric, only the upper or the lower triangular nonzero elements must be furnished.
+
+Some instructions on how to declare matrices using these classes are given in the next chapter, which also describes how to define a new matrix class if none of those listed below can efficiently represent the problem being solved.
+
+\begin{center}
+	\renewcommand{\arraystretch}{1.2}
+	$\begin{array}{@{}lrl@{}}\toprule
+	\text{Library used} & & \text{Class name} \\\midrule
+	\text{SuperLU (CSC format)} & \text{symmetric:} & \texttt{ARluSymMatrix}\\
+	& \text{non-symmetric:} & \texttt{ARluNonSymMatrix}\\\midrule
+	\text{UMFPACK (CSC format)} & \text{symmetric:} & \texttt{ARumSymMatrix}\\
+	& \text{non-symmetric:} & \texttt{ARumNonSymMatrix}\\\midrule
+	\text{LAPACK (band format)} & \text{symmetric:} & \texttt{ARbdSymMatrix}\\
+	& \text{non-symmetric:} & \texttt{ARbdNonSymMatrix}\\\midrule
+	\text{LAPACK (dense)} & \text{symmetric:} & \texttt{ARdsSymMatrix}\\
+	& \text{non-symmetric:} & \texttt{ARdsNonSymMatrix}\\\bottomrule
+	\end{array}$
+\end{center}
+
+
+\section{Computational modes}
+\index{Computational modes}
+For some eigenvalue problems, it is also important to select the appropriate spectral transformation strategy to be used. Some spectral transformations are required to solve generalized problems, while others can be employed to enhance convergence to a particular portion of the spectrum. However, most of these transformations require the solution of linear systems, so the user must be aware of the memory requirements related to each one of them. Some care must also be taken to assure that the desired portion of the spectrum is computed.
+
+In \ARPP{}, these transformations are called \textit{computational modes}. \ARPP{} classes contain a different constructor for each computational mode, so the user must select one of them when declaring an object of a specific class.
+
+\ARPP{} computational modes are listed below. Some examples on how to define the appropriate mode for a specific problem are given in the next chapter and in the appendix. An exhaustive description of all available \ARP{} modes can be found in \cite{T:6}.
+
+\subsection{Real symmetric standard problems}
+\index{Computational modes!real symmetric standard}
+There are two computational modes designed to solve a problem in the standard form $Ax=x\lambda$, with a real symmetric matrix A, depending on the portion of the spectrum to be computed. One of these modes should be selected when declaring objects of \texttt{ARSymStdEig}, \texttt{ARluSymStdEig} or \texttt{ARrcSymStdEig} classes.
+
+\paragraph{1. Regular mode.}
+This first driver is well suited to find eigenvalues with largest or smallest algebraic value, or eigenvalues with largest or smallest magnitude. Since this mode is straightforward and does not require any data transformation, it only requires the user to supply A stored as a dense matrix, or in CSC or band format, or a function that computes the matrix-vector product $y \leftarrow Ax$. 
+
+\paragraph{2. Shift-and-invert mode.}
+This driver may be used to compute eigenvalues near a shift $\sigma$ and is often used when the desired eigenvalues are clustered or not extreme. With this spectral transformation, the eigenvalue problem is rewritten in the form
+\[(A-\sigma I)^{-1} x=x\nu\]
+
+It is easy to prove that $\nu$, the eigenvalues of largest magnitude of $OP=(A-\sigma I)^{-1}$, can be used to calculate the eigenvalues $\lambda$ that are nearest to $\sigma$ in absolute value. The relation between them is $\nu = 1 / (\lambda - \sigma )$ or $\lambda =\sigma + 1/\nu $. Eigenvectors of both the original and the transformed systems are the same, so no backward transformation is required in this case.
+
+The major drawback of this mode is the necessity of evaluating the matrix-vector product $y \leftarrow OPx$, which means that a function that solves a linear systems involving $(A-\sigma I)$ must be available. This function is provided internally by \ARPP{} if \texttt{ARluSymStdEig} is being used, but it must be defined by the user when one of the \texttt{ARSymStdEig} or \texttt{ARrcSymStdEig} classes is employed.
+
+\subsection{Real symmetric generalized problems.}
+\index{Computational modes!real symmetric generalized}
+\ARPP{} also provides three classes, named \texttt{ARSymGenEig}, \texttt{ARluSymGenEig} and \texttt{ARrcSymGenEig}, to solve symmetric real generalized problems in the form $Ax=Bx\lambda$. These classes include four different \textit{modes} that can be selected according to some problem characteristics 
+
+\paragraph{1. Regular mode.}
+As in the standard case, this mode is well suited to find eigenvalues with largest or smallest algebraic value or magnitude. Two matrix-vector products are performed (and must be supplied if \texttt{ARSymGenEig} or \texttt{ARrcSymGenEig} are being used) in this mode:
+\[w \leftarrow OPx=B^{-1} Ax \ \ \text{ and } \ \ z \leftarrow Bx\]
+
+The regular mode is effective when $B$ is symmetric and positive definite but can not be efficiently decomposed using a sparse Cholesky factorization $B=LL^{T}$. If this decomposition is feasible and $B$ is well conditioned, then it is better to rewrite the generalized problem in the form
+\[(L^{-1} AL^{-T} )y=y\lambda,\]
+where $L^{T}x=y$, and use one of the classes designed to solve standard problems. Naturally, in this case, each matrix-vector product $(L^{-1} AL^{-T})z$ should be performed in three steps, including a product in the form $w \leftarrow Ax$ and the solution of two triangular systems.
+
+\paragraph{2. Shift-and-invert mode.}
+To find eigenvalues near a shift $\sigma$ in a generalized problem, it is necessary to transform the problem into
+\[(A-\sigma B)^{-1} Bx=x\nu\]
+
+After finding the eigenvalues of largest magnitude for the above problem, the desired original eigenvalues are easily obtained using the relation $\lambda =\sigma + 1/\nu$, as in the standard case. 
+
+This transformation is done automatically by \ARPP{}, but the required matrix-vector products, $y \leftarrow OPz$, where $OP=(A-\sigma B)^{-1}$, and $w \leftarrow Bz$, must be performed by the user if the class being used is other than \texttt{ARluSymGenEig}. Matrix $B$ is supposed to be symmetric positive semi-definite.
+
+\paragraph{3. Buckling mode.}
+This mode can also be used to find eigenvalues near a shift $\sigma$. If $Ax=Bx\lambda$ is rewritten in the form
+\[(A-\sigma B)^{-1} Ax=x\nu,\]
+the largest eigenvalues $\nu$ of this system and the eigenvalues of the original problem are related by $\lambda =\sigma \nu /(\nu -1)$. The matrix-vector products involved in this mode are $y \leftarrow OPz$ and $w \leftarrow Az$, where $OP=(A-\sigma B)^{-1}$. They must be supplied by the user in case one of the \texttt{ARSymGenEig} or \texttt{ARrcSymGenEig} classes are being used. Moreover, matrix $A$ must be symmetric positive semi-definite.
+
+\paragraph{4. Cayley mode.}
+In this last mode, to find eigenvalues near a shift $\sigma$, the system $Ax=Bx\lambda$ is transformed into
+\[(A-\sigma B)^{-1} (A+\sigma B)x=x\nu\]
+
+The relation between the largest eigenvalues of this system and the desired eigenvalues is given by $\lambda =\sigma (\nu +1) /(\nu -1)$. In this mode, matrix $B$ is required to be symmetric positive semi-definite. 
+
+Only the shift must be defined by the user if \texttt{ARluSymGenEig} is being used. However, three different matrix-vector products must be supplied to both the \texttt{ARSymGenEig} and the \texttt{ARrcSymGenEig} classes. These products are $y \leftarrow OPz$, $w \leftarrow Az$ and $u \leftarrow Bz$, where $OP=(A-\sigma B)^{-1}$.
+
+\subsection{Real nonsymmetric standard problems}
+\index{Computational modes!real nonsymmetric standard}
+There are also two drivers for nonsymmetric standard eigenvalue problems. They are handled by \ARPP{} classes \texttt{ARNonSymStdEig}, \texttt{ARluNonSymStdEig} and \texttt{ARrcNonSymStdEig}.
+
+\paragraph{1. Regular mode.}
+This driver can be used to find eigenvalues with smallest or largest magnitude, real part or imaginary part. It only requires the user to supply the nonzero structure of matrix $A$ or a function that computes the matrix-vector product $y \leftarrow Ax$. Naturally, when computing eigenvalues of smallest magnitude, the user must consider also the possibility of using $A^{-1}$ and the shift and invert mode with zero shift, because \ARP{} is more effective at finding extremal well separated eigenvalues.
+
+\paragraph{2. Shift-and-invert mode.}
+This driver may be used to compute eigenvalues near a shift s and is often used when the desired eigenvalues are not extreme (see the section on \textit{real symmetric standard problems }for a brief description of this mode). 
+
+When class \texttt{ARluNonSymStdEig} is being used, only the shift must be furnished. However, to use this spectral transformation combined with one of the class \texttt{ARNonSymStdEig} or \texttt{ARrcNonSymStdEig}, the user must supply a function that evaluates the matrix-vector product
+\[y \leftarrow OPx=(A-\sigma I)^{-1} x\]
+where $\sigma$ is supposed to be real. To define a complex shift, the user should use a generalized driver or redefine the problem as a complex one.
+
+\subsection{Real nonsymmetric generalized problems}
+\index{Computational modes!real nonsymmetric generalized}
+To find eigenvalues of nonsymmetric generalized problems, the user can use one of the three different modes supplied by \ARPP{} classes \texttt{ARNonSymGenEig}, \texttt{ARluNonSymGenEig} and \texttt{ARrcNonSymGenEig}. These modes differ on the part of the spectrum that is sought. All of them require matrix $B$ to be symmetric positive semi-definite.
+
+\paragraph{1. Regular mode.}
+As in the symmetric case, to solve problems in regular mode the user can supply only the nonzero structure of matrices $A$ and $B$ in CSC format. As an alternative, it is also possible to supply two functions: one that computes the matrix-vector product
+\[w \leftarrow OPx=B^{-1} Ax\] 
+and other that returns the product $z \leftarrow Bx$. Again, this mode is effective when $B$ is ill-conditioned (nearly singular) or when $B$ cannot be efficiently decomposed using a sparse Cholesky factorization $B=LL^{T}$. If $B$ is well conditioned and can be factored then the conversion to a standard problem is recommended.
+
+\paragraph{2. Real shift and invert mode.}
+This mode can be used to find eigenvalues near a real shift $\sigma$. Only matrices $A$, $B$ and the shift $\sigma$ are required if class \texttt{ARluNonSymGenEig} is being used. When using \texttt{ARNonSymGenEig} or \texttt{ARrcNonSymGenEig}, the user must supply two functions that evaluate the products:
+\[y\leftarrow OPx=(A-\sigma B)^{-1} x \ \ \text{and} \ \ w\leftarrow Bx.\]
+
+See the section on symmetric problems for more details.
+
+\paragraph{3. Complex shift and invert mode.}
+To find eigenvalues near a complex shift $\sigma$ in a nonsymmetric generalized problem, \ARPP{} needs to perform three different matrix-vector products: 
+\[y\leftarrow OPx, \ \ v\leftarrow Bx \ \ \text{and} \ \ w\leftarrow Ax,\]
+
+where \textit{OP} can be set to the real or imaginary part of $(A-\sigma B)^{-1}$. The first two products are used to find the eigenvalues of largest magnitude of the problem
+\[(A-\sigma B)^{-1} Bx=x\nu.\]
+
+The last product is required to recover the eigenvalues of the original problem. Because the relation between $\nu$ and $\lambda$ is not bijective in this case, the Rayleigh quotient 
+\[\lambda = \dfrac{x^{H} Ax}{x^{H} Bx}\] 
+is used to obtain the correct eigenvalues. 
+
+These products are internally performed if class \texttt{ARluNonSymStdEig} is being used. Otherwise, they must be supplied by the user.
+
+\subsection{Complex standard problems}
+\index{Computational modes!complex standard}
+If the eigenvalue problem $Ax=x\lambda$ has complex data, one of the two drivers of classes \texttt{ARCompStdEig}, \texttt{ARluCompStdEig} and \texttt{ARrcCompStdEig} should be used. These drivers are similar to those presented above, and are briefly described here.
+
+\paragraph{1. Regular mode.}
+This driver can be used to find eigenvalues with smallest or largest magnitude, real part or imaginary part. $y \leftarrow Ax$ is the only matrix-vector product required to solve a problem in this mode. This product must be supplied if a class other than \texttt{ARluCompStdEig} is used.
+
+\paragraph{2. Shift-and-invert mode.}
+This driver may be used to compute eigenvalues near a complex shift $\sigma$ . When one of the \texttt{ARCompStdEig} or \texttt{ARrcCompStdEig} classes is being used, the user must supply a function that evaluates the matrix-vector product 
+\[y\leftarrow OPx=(A-\sigma I)^{-1} x\]
+
+\subsection{Complex generalized problems}
+\index{Computational modes!complex generalized}
+This is the last group of problems \ARPP{} is able to solve. The corresponding classes are called \texttt{ARCompGenEig}, \texttt{ARluCompGenEig} and \texttt{ARrcCompGenEig}. These classes also include two drivers. 
+
+\paragraph{1. Regular mode.}
+When solving generalized problems in regular mode without using the \texttt{ARluCompGenEig} class, the user is required to supply two functions that compute the matrix-vector products
+\[w\leftarrow OPx=B^{-1} Ax \ \ \text{and} \ \ z\leftarrow Bx.\] 
+
+If \texttt{ARluCompGenEig} is being used, $A$ and $B$ must be supplied as a dense matrix or in band or compressed sparse column format.
+
+\paragraph{2. Shift and invert mode.}
+This mode can be used to find eigenvalues near a complex shift $\sigma$. When using one of the \texttt{ARCompGenEig} or \texttt{ARrcCompGenEig} classes, the user must supply two functions that evaluate the products
+\[y\leftarrow OPx=(A-\sigma B)^{-1} x \ \ \text{and} \ \ w\leftarrow Bx.\]
+
+See the section about symmetric problems for more details.
+
+\section{ARPACK++ functions}
+
+\ARPP{} classes contain several member functions designed to supply information about problem data, to change some parameters, to solve problems in various computational modes and to return eigenvalues and eigenvectors. Most of them are defined as virtual members of only four classes - \texttt{ARrcStdEig}, \texttt{ARrcNonSymStdEig}, \texttt{ARrcSymStdEig} and \texttt{ARrcCompStdEig} - and inherited or changed by other derived classes. This procedure reduces the necessity of redefining functions and permits the user to add his own classes to the library by only defining a few constructors.
+
+The functions can be divided according to their purposes into eight groups. These groups are summarized below. Only a brief explanation is given here, so the user should refer to the appendix for a complete description of \ARPP{} functions and their parameters.
+
+\subsection{Setting problem parameters.}
+
+Generally, an eigenvalue problem is set by passing all problem parameters to the class constructor. However, sometimes the parameters may not be available when the problem is declared, so the user may be forced to define them later. The functions listed below are intended to help the user in such cases.
+
+\begin{tabularx}{\textwidth}{LX}
+	DefineParameters & Sets the values of variables that are usually passed as parameters to class constructors.\\
+	SetBucklingMode & Turns a generalized symmetric real problem into buckling mode.\\
+	SetCayleyMode & Turns a generalized symmetric real problem into Cayley mode.\\
+	SetComplexShiftMode & Turns a generalized nonsymmetric real problem into complex shift and invert mode.\\
+	SetRegularMode & Turns any eigenvalue problem into regular mode.\\
+	SetShiftInvertMode & Turns any eigenvalue problem into shift and invert mode.\\
+\end{tabularx}
+
+\subsection{Changing problem parameters}
+
+Although changes in problem data are not very common, they are allowed by \ARPP{}, so the user can overcome some atypical situations were program fails to solve a problem with the mode or other parameter previously chosen. The functions that can be used with this purpose are:
+
+\begin{tabularx}{\textwidth}{LX}
+	ChangeMaxit & Changes the maximum number of iterations allowed.\\
+	ChangeMultBx & Changes the function that performs the product \textit{Bx}.\\
+	ChangeMultOPx & Changes the function that performs the product \textit{OPx}.\\
+	ChangeNcv & Changes the number of Arnoldi vectors generated at each iteration.\\
+	ChangeNev & Changes the number of eigenvalues to be computed.\\
+	ChangeShift & Turns the problem into shift and invert mode (or changes the shift if this mode is already being used).\\
+	ChangeTol & Changes the stopping criterion.\\
+	ChangeWhich & Changes the part of the spectrum that is sought.\\
+	InvertAutoShift & Changes the shift selection strategy used to restart the Arnoldi method.\\
+	NoShift & Turns the problem into regular mode.\\
+\end{tabularx}
+
+\subsection{Retrieving information about the problem}
+
+Some \ARPP{} functions can be helpful if one wants to know which parameters were employed to solve an eigenvalue problem. They can be used, for example, to build other functions that require information about some details of the eigenvalue problem, such as the computational mode or the stopping criterion adopted, without explicitly passing each parameter in the function heading.
+
+A list of the \ARPP{} functions that return problem data is given below. Some of them are also used in various examples included in next two chapters.
+
+\begin{tabularx}{\textwidth}{LX}
+	GetAutoShift & Indicates if exact shifts are being used to restart the Arnoldi method.\\
+	GetMaxit & Returns the maximum number of iterations allowed.\\
+	GetIter & Returns the number of iterations actually taken to solve a problem.\\
+	GetMode & Returns the computation mode used.\\
+	GetN & Returns the dimension of the problem.\\
+	GetNcv & Returns the number of Arnoldi vectors generated at each iteration.\\
+	GetNev & Returns the number of required eigenvalues.\\
+	GetShift & Returns the shift used to define a spectral transformation.\\
+	GetShiftImag & Returns the imaginary part of the shift.\\
+	GetTol & Returns the tolerance used to declare convergence.\\
+	GetWhich & Returns the portion of the spectrum that was sought.\\
+	ParametersDefined & Indicates if all problem parameters were correctly defined.\\
+\end{tabularx}
+
+\subsection{Determining eigenvalues and eigenvectors}
+
+The most important and most frequently used \ARPP{} functions are listed below. With them, one can determine eigenvalues, eigenvectors, Schur vectors or an Arnoldi basis.
+
+Instead of supplying one single function that solves the eigenvalue problem, \ARPP{} gives the user various alternatives to determine and store just the desired part of the solution. There are eleven different functions. Each one stores a particular group of vectors using a specific output format.
+
+The three output formats available are used here to group the functions.
+
+\paragraph{1. Functions that use ARPACK++ internal data structure.}
+
+This first group contains functions that solve the eigenvalue problem and store the output vectors into \ARPP{} internal data structure, so the user does not need to worry about how and where eigenvalues and eigenvectors are stored. 
+
+The output data, retrieving generated by these functions can be retrieved later by using one of the several functions described in the \textit{Retrieving eigenvalues and eigenvectors} section below.
+
+\begin{tabularx}{\textwidth}{LX}
+	FindArnoldiBasis & Determines an Arnoldi basis.\\
+	FindEigenvalues & Determines eigenvalues.\\
+	FindEigenvectors & Determines eigenvectors (and optionally Schur vectors).\\
+	FindSchurVectors & Determines Schur vectors.\\
+\end{tabularx}
+
+\paragraph{2. Functions that store output data in user-supplied vectors.}
+
+Using functions of this second group, it is possible to solve the eigenvalue problem and store the output data in user-supplied c++ standard vectors. 
+
+\begin{tabularx}{\textwidth}{LX}
+	Eigenvalues & Returns the eigenvalues of the problem being solved and optionally determines eigenvectors and Schur vectors.\\
+	EigenValVectors & Returns the eigenvalues and eigenvectors of the given problem (and optionally determines Schur vectors).\\
+	Eigenvectors & Returns the eigenvectors of the given problem (and optionally determine Schur vectors).\\
+\end{tabularx}
+
+\paragraph{3. Functions that generate objects of the STL vector class}
+
+Functions of this last group are used to solve the eigenvalue problems and return output data into objects of the STLStandard Template Library vector class.
+
+\begin{tabularx}{\textwidth}{LX}
+	StlArnoldiBasisVectors & Returns an Arnoldi basis for the problem being solved.\\
+	StlEigenvalues & Returns a vectors that contains the eigenvalues of the given problem. Optionally, Eigenvectors and Schur vectors can also be determined and stored into \ARPP{} internal data structure.\\
+	StlEigenvectors & Returns a vector that stores sequentially the eigenvectors of the problem being solved. Eigenvalues (and optionally Schur vectors) are also determined and stored internally by \ARPP{}.\\
+	StlSchurVectors & Returns a vector that contains the Schur vectors of the problem being solved.\\
+\end{tabularx}
+
+\subsection{Tracking the progress of ARPACK}
+
+The FORTRAN version of \ARP{} provides a means to trace the progress of the computation of the eigenvalues and eigenvectors as it proceeds. Various levels of output are available, from no output to voluminous. This feature is also supported by \ARPP{} through the two functions listed below: 
+
+\begin{tabularx}{\textwidth}{LX}
+	Trace & Turns trace mode on.\\
+	NoTrace & Turns trace mode off. \hspace{8cm} \ \ \ \ \ \ \\
+\end{tabularx}
+
+\subsection{Executing ARPACK++ step by step}
+
+The \textit{reverse communication interface} classes requires the user to interact with \ARPP{} and perform matrix-vector products, user-supplied on request during the computation of the eigenvalue and eigenvectors. 
+
+However, to perform a product, say $y\leftarrow Mx$, one needs to know where \textit{x} is stored, and also where to put \textit{y}. The same occurs when the user decides to supply the shifts for the implicit restarting of the Arnoldi method: it is necessary to determine where to store the shifts. This kind of information is provided by the functions listed below. 
+
+\begin{tabularx}{\textwidth}{LX}
+	GetIdo & Indicates the operation that must be performed by the user between two successive calls to TakeStep.\\
+	GetNp & Returns the number of shifts that must be supplied for the implicit restarting of the Arnoldi method.\\
+	GetProd & Indicates where the product \textit{Bx} is stored.\\
+	GetVector & Indicates where x is stored when a product in the form \textit{Mx} must be performed.\\
+	GetVectorImag & Indicates where the imaginary part of the eigenvalues of the current Hessenberg matrix are stored.\\
+	PutVector & Indicates where to store the product \textit{OPx} (or \textit{Bx}).\\
+	TakeStep & Performs the calculations required between two successive matrix-vector products.\\
+\end{tabularx}
+
+\subsection{Detecting if the solution of the eigenvalue problem is available}
+
+In various situations, notably when solving the eigenvalue problem step by step, the user needs to find out if the solution of the problem is already available, in order to proceed with his own computations. In such cases, one of the functions listed below should be used.
+
+\begin{tabularx}{\textwidth}{LX}
+	ConvergedEigenvalues & Returns the number of eigenvalues found so far.\\
+	ArnoldiBasisFound & Indicates if the requested Arnoldi basis is available.\\
+	EigenvaluesFound & Indicates if the requested eigenvalues are available.\\
+	EigenvectorsFound & Indicates if the requested eigenvectors are available.\\
+	SchurVectorsFound & Indicates if the requested Schur vectors are available.\\
+\end{tabularx}
+
+\subsection{Retrieving eigenvalues and eigenvectors.}
+
+Various functions contained in the \textit{Determining eigenvalues and eigenvectors} section above (\texttt{FindEigenvalues} and \texttt{Eigenvectors} are just two of them) use \ARPP{} internal data structure to store part of the solution, or even the whole solution of the eigenvalue problem.
+
+This section contains several functions that permit the user to retrieve those output vectors internally stored by \ARPP{}. The functions listed below can be used to obtain from a particular element of an Arnoldi basis vector to a vector that contains all eigenvectors stored sequentially.
+
+\paragraph{1. Functions that return vector elements.}
+
+For those people that do not want to worry about how and where to store eigenvalues and eigenvectors, \ARPP{} includes some functions that permit direct access to every single element of the output vectors. These functions are listed below.
+
+\begin{tabularx}{\textwidth}{LX}
+	ArnoldiBasisVector & Returns one element of an Arnoldi basis vector.\\
+	Eigenvalue & Returns one of the ``converged'' eigenvalues.\\
+	EigenvalueReal & Returns the real part of an eigenvalue (when the problem is real and nonsymmetric).\\
+	EigenvalueImag & Returns the imaginary part of an eigenvalue (when the problem is real and nonsymmetric).\\
+	Eigenvector & Returns one element of a single eigenvector.\\
+	EigenvectorReal & Returns the real part of one element of an eigenvector (when the problem is real and nonsymmetric).\\
+	EigenvectorImag & Returns the imaginary part of one element of an eigenvector (when the problem is real and nonsymmetric).\\
+	SchurVector & Returns one element of a Schur vector.\\
+	ResidualVector & Returns one element of the residual vector.\\
+\end{tabularx}
+
+\paragraph{2. Functions that return pointers to vectors.}
+
+\ARPP{} also includes functions that return vector addresses instead of vector components. Their purpose is to permit the user to supply eigenvalues and eigenvectors (or any other vector stored into \ARPP{} internal data structure) as input parameters to other functions. 
+
+\begin{tabularx}{\textwidth}{LX}
+	RawArnoldiBasisVector & Returns a pointer to a vector that stores one of the Arnoldi basis vectors.\\
+	RawArnoldiBasisVectors & Returns a pointer to a vector that contains the Arnoldi basis.\\
+	RawEigenvalues & Returns a pointer to a vector that contains the eigenvalues (or the real part of them, if the problem is real and nonsymmetric).\\
+	RawEigenvaluesImag & Returns a pointer to a vector that contains the imaginary part of the eigenvalues, when the problem is real and nonsymmetric.\\
+	RawEigenvectors & Returns a pointer to a vector that stores all of the eigenvalues consecutively.\\
+	RawEigenvector & Returns a pointer to a vector that stores one of the eigenvectors.\\
+	RawSchurVectors & Returns a pointer to a vector that stores the Schur vectors consecutively.\\
+	RawSchurVector & Returns a pointer to a vector that stores one of the Schur vectors.\\
+	RawResidualVector & Returns a pointer to a vector that contains the residual vector.\\
+\end{tabularx}
+
+\paragraph{3. Functions that return STL vectors.}
+
+There are also functions that return output vectors using the STL \texttt{vector} class. Besides \texttt{StlEigenvalues}, \texttt{StlEigenvectors} and \texttt{StlSchurVectors}, listed earlier in this chapter, this group also includes:
+
+\begin{tabularx}{\textwidth}{LX}
+	StlArnoldiBasisVector & Returns one of the Arnoldi basis vectors.\\
+	StlEigenvaluesReal & Returns the real part of the eigenvalues, when the problem is real and nonsymmetric.\\
+	StlEigenvaluesImag & Returns the imaginary part of the eigenvalues, when the problem is real and nonsymmetric.\\
+	StlEigenvector & Returns one of the eigenvectors.\\
+	StlEigenvectorReal & Returns the real part of an eigenvector, when the problem is real and nonsymmetric.\\
+	StlEigenvectorImag & Returns the imaginary part of an eigenvector, when the problem is real and nonsymmetric.\\
+	StlSchurVector & Returns one of the Schur vectors.\\
+	StlResidualVector & Returns the residual vector.\\
+\end{tabularx}

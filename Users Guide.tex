@@ -1,0 +1,53 @@
+\documentclass[
+	11pt,
+	a4paper,
+	oneside,
+	openright,
+	titlepage,
+	parskip=half,
+	headings=normal,
+	bibliography=totoc,
+	index=totoc,
+	final
+]{scrbook}
+
+\author{Francisco M. Gomes, Danny C. Sorensen}
+
+\input{common/config}
+
+\makeindex
+
+\hypersetup{
+	pdftitle={ARPACK++ Users' Guide},
+	pdfauthor={Francisco M. Gomes, Danny C. Sorensen},
+	pdfcreator={Francisco M. Gomes, Danny C. Sorensen},
+	pdfsubject={An object-oriented version of ARPACK eigenvalue package.},
+	pdfkeywords={ARPACK, eigenvalue, object-oriented, C++, package, SuperLU}
+}
+
+\begin{document}
+
+\input{ug/cover}
+
+\tableofcontents
+
+\setcounter{chapter}{-1} % Start section numbering with 0.
+
+\input{ug/chapter-0}
+
+\input{ug/chapter-1}
+
+\input{ug/chapter-2}
+
+\input{ug/chapter-3}
+
+\input{ug/chapter-4}
+
+\input{ug/chapter-5}
+
+\bibliography{references}
+\bibliographystyle{ieeetr}
+
+\printindex
+	
+\end{document}

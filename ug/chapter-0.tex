@@ -1,0 +1,33 @@
+\chapter{Introduction}
+
+\ARPP{} is an object-oriented version of the \ARP{} package. \ARP{} \cite{T:6} is a well-known collection of FORTRAN subroutines designed to compute a few eigenvalues and, upon request, eigenvectors of large scale sparse matrices and pencils. It is capable of solving a great variety of problems from single precision positive definite symmetric problems to double precision complex non-Hermitian generalized eigenvalue problems. 
+
+\ARP{} implements a variant of the Arnoldi process for finding eigenvalues called \textit{implicit restarted Arnoldi method} (IRAM) \cite{T:10, T:11}. IRAM combines Arnoldi factorizations with an implicitly shifted QR mechanism to create a new method that is appropriate for very large problems. In most cases only a compressed matrix or a matrix-vector product $y\leftarrow Ax$ must be supplied by the user.
+
+\ARPP{} is a collection of classes that offers c++ programmers an interface to \ARP{}. It preserves the full capability, performance, accuracy and memory requirements of the FORTRAN package, but takes advantage of the c++ object-oriented programming environment.
+
+The main features of \ARP{} preserved by the c++ version include:
+
+\begin{itemize}
+	\item The ability to return a few eigenvalues that satisfy a user specified criterion, such as largest real part, largest absolute value, etc.
+	\item A fixed pre-determined storage requirement. Usually, only $n\cdot O(k)+O(k^2)$ memory locations are used to find \textit{k} eigenvalues of an \textit{n}-dimensional problem.
+	\item A user-specified numerical accuracy for the computed eigenvalues and eigenvectors. Residual tolerances may be set to the level of working precision.
+	\item The ability to find multiple eigenvalues without any theoretical or computational difficulty other than some additional matrix-vector products required to expose the multiple instances. This is made possible through the implementation of deflation techniques similar to those employed to make the implicit shifted QR algorithm robust and practical. Since a block method is not required, the user does not need to “guess” the correct block size that would be needed to capture multiple eigenvalues.
+	\item Several alternatives to solve the symmetric generalized problem $Ax=Mx\lambda$ for singular or ill-conditioned symmetric positive semi-definite \textit{M}.
+\end{itemize}
+
+Other features that are exclusive to \ARPP{} are:
+
+\begin{itemize}
+	\item \textbf{The use of templates}. Class templates, or containers, are the most noticeable way of defining generic data types. They combine run-time efficiency and massive code and design reutilization. \ARPP{} uses templates to reduce the work needed to establish and solve eigenvalue problems and to simplify the structure utilized to handle such problems. One class will handle single and double precision problems. Depending on the data structure used, a single class can also be used to define real and complex matrices.
+	\item \textbf{A friendly interface}. \ARPP{} avoids the complication of the \textit{reverse communication interface} that characterizes the FORTRAN version of \ARP{}. It contains many class templates that are easy to use. Some of them require the user to supply only the nonzero elements of a matrix, while others demand the definition of a class that includes a matrix-vector function. Nevertheless, the \textit{reverse communication interface} is also preserved in the c++ package, allowing the user to solve an eigenvalue problem iteratively, performing explicitly all of the matrix-vector products required by the Arnoldi method.
+	\item \textbf{A great number of auxiliary functions}. \ARPP{} gives the user various alternatives for handling an eigenvalue problem. There are many functions to set  and modify problem parameters, and also several output functions. For instance, seven different functions can be used to determine the eigenvectors of a problem. There are also ten functions that return from a single element of an eigenvector to an STL vector that contains all of the eigenvectors.
+	\item \textbf{The ability to easily find interior eigenvalues and to solve generalized problems}. \ARPP{} includes several matrix classes that use state-of-the-art routines from SuperLU, UMFPACK and \LAP{} to solve linear systems. When one of these classes is used, spectral transformations such as the shift and invert method can be employed to find internal eigenvalues of regular and generalized problems without requiring the user to explicitly solve linear systems.
+	\item \textbf{A structure that simplify the linkage with other libraries}. The main aim of  \ARPP{} is not only to allow the user to efficiently handle even the most intricate problems, but also to minimize the work needed to generate an interface between \ARP{} and other libraries, such as the Template Numerical Toolkit (TNT) \cite{T:9}.
+\end{itemize}
+
+In the first chapter, some instructions are given on how to install \ARPP{}. Chapter 2 discusses briefly what is necessary to start solving eigenvalue problems with the library. Differences and similarities between \ARPP{} classes and its computational modes are described in chapter 3. Chapter 4 contains more detailed instructions on how to create an eigenvalue problem, while some examples that illustrate \ARPP{} usage were included in chapter 5. Finally, all classes, functions, constructor and template parameters are fully described in the appendix: \ARPP{} reference guide.
+
+The authors would like to acknowledge Dr. Roldan Pozo and Dr. Kristyn Maschhoff for their insightful suggestions and support.
+
+Financial support for this work was provided in part by FAPESP (Brazil), grant 96/2556-9, by the National Science Foundation cooperative agreement CCR-912008 and by the ARPA contract number DAAL03-91-C-0047 (administered by the U.S. Army Research Office).

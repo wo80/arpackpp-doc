@@ -1,0 +1,176 @@
+\chapter{Getting started with ARPACK++}
+
+The purpose of the chapter is to give a brief introduction to \ARPP{} while depicting the kind of information the user is required to provide to easily solve eigenvalue problems.
+
+The example included here is very simple and is not intended to cover all \ARPP{} features. In this example, a real nonsymmetric matrix in \textit{Compressed Sparse Column (CSC)} format is generated and its eigenvalues and eigenvectors determined by using the AREig function.
+
+Other different ways of creating elaborate \ARPP{} objects and solving more difficult problems, such those that require the use of spectral transformations, will be presented in chapter four. A full description of all \ARPP{} classes and functions is the subject of the appendix.
+
+\section{A real nonsymmetric example}
+
+Perhaps, the easiest way of getting started with \ARPP{} is trying to run the \texttt{simple.cc} example contained in the \texttt{examples/areig/nonsym} directory.
+
+A slightly modified version of simple.cc is reproduced below. It illustrates 
+\begin{enumerate}
+	\item How to declare a matrix in CSC format;
+	\item How to pass matrix data to the \texttt{AREig} function;
+	\item How to use \texttt{AREig} to obtain some eigenvalues and eigenvectors; and
+	\item How to store output data.
+\end{enumerate}
+
+\begin{cppcode}
+/*
+MODULE Simple.cc
+Simple example program that illustrates how to solve a real
+nonsymmetric standard eigenvalue problem in regular mode
+using the AREig function.
+*/
+
+#include "areig.h"
+#include <math.h>
+#include "lnmatrxc.h"
+
+main()
+{
+	// Declaring variables needed to store 
+	// A in compressed sparse column (CSC) format.
+	
+	int     n;      // Dimension of matrix.
+	int     nnz;    // Number of nonzero elements in A.
+	int*    irow;   // Row index of all nonzero elements of A.
+	int*    pcol;   // Pointer to the beginning of each column.
+	double* A;      // Nonzero elements of A.
+	
+	// Generating a double precision nonsymmetric 100x100 matrix.
+	
+	n = 100;
+	Matrix(n, nnz, A, irow, pcol);
+	
+	// Declaring AREig output variables.
+	
+	int     nconv;                // Number of converged eigenvalues.
+	double* EigValR = new double[100];    // Eigenvalues (real part).
+	double* EigValI = new double[100];    // Eigenvalues (imag part).
+	double* EigVec  = new double[1100];   // Eigenvectors.
+	
+	// Finding the five eigenvalues with largest magnitude
+	// and the related eigenvectors.
+	
+	nconv = AREig(EigValR, EigValI, EigVec, n, nnz, A, irow, pcol, 5);
+	
+	// Printing eigenvalues.
+	
+	cout << "Eigenvalues:" << endl;
+	for (int i=0; i<nconv; i++) {
+		cout << "  lambda[" << (i+1) << "]: " << EigValR[i];
+		if (EigValI[i]>=0.0) {
+			cout << " + " << EigValI[i] << " I" << endl;
+		}
+		else {
+			cout << " - " << fabs(EigValI[i]) << " I" << endl;
+		}
+	}
+} // main.
+\end{cppcode}
+In the example above, \texttt{Matrix} is a function that returns the variables \texttt{nnz}, \texttt{A}, \texttt{irow}, and \texttt{pcol}. These variables are used to pass matrix data to the \texttt{AREig} function, as described in the next section. The number of desired eigenvalues (five) must also be declared when calling \texttt{AREig}.
+
+\texttt{AREig} is not a true \ARPP{} function. Although being a MATLAB-style function that can be used solve most eigenvalue problems in a very straightforward way, \texttt{AREig} does not explore most \ARPP{} capabilities. It was included here only as an example, merely to introduce the software. The user is urged to check out chapters 3 and 4 to see how to really take advantage of all \ARPP{} features.
+
+\texttt{AREig} was defined in a file called \texttt{examples/areig/areig.h} and contains some basic \ARPP{} commands needed to find eigenvalues using the SuperLU package. Therefore, to use this function, SuperLU must be previously installed (following the directions given in chapter one).
+
+\texttt{EigVec}, \texttt{EigValR}, \texttt{EigValI} and \texttt{nconv} are output parameters of \texttt{AREig}. \texttt{EigVec} is a vector that stores all eigenvectors sequentially (see chapter 5 or the appendix). \texttt{EigValR} and \texttt{EigValI} are used to store, respectively, the real and imaginary parts of matrix eigenvalues. \texttt{nconv} indicates how many eigenvalues with the requested precision were actually obtained.
+
+Many other \ARPP{} parameters can be passed as arguments to \texttt{AREig}. Because these other parameters were declared as \textit{default arguments}, they should be defined only if the user does not want to use the default values provided by \ARPP{}. 
+
+\subsection{Defining a matrix in Compressed Sparse Column format}
+
+The \texttt{Matrix} function below shows briefly how to generate a sparse real nonsymmetric matrix in CSC format. See the definition of the \texttt{ARluNonSymMatrix} and \texttt{ARumNonSymMatrix} classes in the appendix for further information on how to create a matrix using this format.
+
+\texttt{n} is an input parameter that defines matrix dimension. All other parameters are returned by the function. \texttt{A} is a pointer to an array that contains the nonzero elements of the matrix. \texttt{irow} is a vector that gives the row index of each element stored in A. Elements of the same column are stored in an increasing order of rows. \texttt{pcol} gives integer pointers to the beginning of all matrix columns.
+
+In this example, the matrix is tridiagonal\footnote{\ARPP{} also includes a band matrix class that could have been used here. However a new class is defined since the purpose of the example is to show how to define a matrix using the CSC format.}, with \texttt{dd} on the main diagonal, \texttt{dl} on the subdiagonal and \texttt{du} on the superdiagonal.
+
+\begin{cppcode}
+template<class FLOAT, class INT>
+void Matrix(INT n, INT& nnz, FLOAT* &A, INT* &irow, INT* &pcol)
+{
+	INT  i, j;
+
+	// Defining constants.
+	FLOAT dd = -1.5;
+	FLOAT dl =  4.0;
+	FLOAT du = -0.5;
+
+	// Defining the number of nonzero matrix elements.
+	nnz = 3*n-2;
+
+	// Creating output vectors.
+	A    = new FLOAT[nnz];
+	irow = new INT[nnz];
+	pcol = new INT[n+1];
+
+	// Filling A, irow and pcol.
+	pcol[0] = 0;
+	j = 0;
+	for (i=0; i!=n; i++) {
+
+		// Superdiagonal.
+		if (i != 0) {
+			irow[j] = i-1;
+			A[j++]  = du;
+		}
+
+		// Main diagonal.
+		irow[j] = i;
+		A[j++]  = dd;
+
+		// Subdiagonal.
+		if (i != (n-1)) {
+			irow[j] = i+1;
+			A[j++]  = dl;
+		}
+
+		// Defining where the next column will begin.
+		pcol[i+1] = j;
+	}
+} // Matrix.
+\end{cppcode}
+
+\subsection{Building the example}
+
+To compile \texttt{simple.cc} and link it to some libraries, \ARPP{} provides a \texttt{Makefile} file. The user just need to type the command
+\begin{verbatim}
+make symsimp
+\end{verbatim}
+However, some other files, such as \texttt{Makefile.inc} and \texttt{include/arch.h}, should be modified prior to compiling the example, in order to correctly define search directories and some machine-dependent parameters (see chapter one).
+
+\section{The AREig function}
+
+\texttt{AREig} is a function intended to illustrate how to solve all kinds of standard and generalized eigenvalue problems, inasmuch as the user can store matrices in CSC format. It is defined in the \texttt{examples/areig/areig.h} file.
+
+Actually, \texttt{areig.h} contains one definition of the \texttt{AREig} function for each different problem supported by \ARP{}. This is called function overloading and is a very used feature of the c++ language. One of the implementations of \texttt{AREig} (the one that is used by the example defined in this chapter) is shown below.
+\begin{cppcode}
+template <class FLOAT>
+int AREig(FLOAT EigValR[], FLOAT EigValI[], FLOAT EigVec[], int n, 
+	int nnz, FLOAT A[], int irow[], int pcol[], int nev, 
+	char* which = "LM", int ncv = 0, FLOAT tol = 0.0, 
+	int maxit = 0, FLOAT* resid = NULL, bool AutoShift = true)
+{
+	// Creating a matrix in ARPACK++ format.
+	ARluNonSymMatrix<FLOAT, FLOAT> matrix(n, nnz, A, irow, pcol);
+	
+	// Defining the eigenvalue problem.
+	ARluNonSymStdEig<FLOAT> prob(nev, matrix, which, ncv, 
+		tol, maxit, resid, AutoShift);
+	
+	// Finding eigenvalues and eigenvectors.
+	return prob.EigenValVectors(EigVec, EigValR, EigValI); 
+}
+\end{cppcode}
+As stated earlier, this function is intended to be simple and easy to use. As a consequence of its simplicity, many features provided by \ARPP{} classes and their member functions are not covered by \texttt{AREig}. It cannot be used, for example, to obtain Schur vectors, but only eigenvalues and eigenvectors. The user also cannot choose among several output formats supplied by \ARPP{}. Only the simplest format can be used.
+
+To overcome in part the limitations imposed by this very stringent structure, \texttt{AREig} uses default parameters. These parameters can be ignored if the default values provided by \ARPP{} are appropriate, but the user can also change their values at his convenience. \texttt{maxit}, the maximum number of Arnoldi iterations allowed, and \texttt{which}, the part of the spectrum that is to be computed, are just two of those parameters. For a complete description of all \ARPP{} parameters, the user should refer to the appendix.
+
+The version of \texttt{AREig} depicted above contains only three commands. The first one declares a matrix using the \texttt{ARluNonSymMatrix} function. The second one defines the eigenvalue problem and sets the \ARPP{} parameters. The third command determines eigenvalues and eigenvectors.
+
+All of these commands may be used directly (and in conjunction to other \ARPP{} functions and classes) so the user needs not to call \texttt{AREig} to solve an eigenvalue problem. However, because this function is quite simple to use, it may be viewed as an interesting alternative to find eigenvalues of a matrix in CSC format.

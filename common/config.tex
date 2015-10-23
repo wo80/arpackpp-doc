@@ -1,0 +1,110 @@
+
+\usepackage{textcomp}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amsfonts,amsthm,amssymb}
+
+%\usepackage[gray]{xcolor}
+\usepackage[svgnames,dvipsnames]{xcolor}
+\definecolor{myorange}{rgb}{0,0.375,1}
+
+\usepackage{
+	%a4wide,
+	ellipsis, mparhack,  %
+	booktabs, longtable, %
+	ltablex              % tabularx with page breaks
+}
+
+\usepackage{makeidx}
+
+\usepackage{fancyvrb}
+\usepackage{minted}
+
+\raggedbottom
+\fvset{frame=lines,
+	framesep=3mm,
+	framerule=2pt,
+	fontsize=\small,
+	rulecolor=\color{myorange},
+	formatcom=\color{DarkGreen},
+}
+
+\newminted{cpp}{tabsize=4,
+	frame=lines,
+	framesep=3mm,
+	baselinestretch=1.1,
+	fontsize=\small
+}
+
+% Graphics on titlepage
+%\usepackage{eso-pic}
+
+\makeatletter % De-TeX-FAQ 
+
+\usepackage{microtype}
+
+\usepackage{ifpdf} % part of the hyperref bundle
+\ifpdf % if pdflatex is used
+
+%set fonts for nicer pdf view
+\IfFileExists{lmodern.sty}{\usepackage{lmodern}}
+  {\usepackage[scaled=0.92]{helvet}
+    \usepackage{mathptmx}
+    \usepackage{courier} }
+\fi
+
+% the pages of the TOC are numbered roman
+% and a pdf-bookmark for the TOC is added
+\let\myTOC\tableofcontents
+\renewcommand\tableofcontents{
+   \pagenumbering{Roman}
+   \pdfbookmark[1]{Contents}{}
+   \myTOC
+   \newpage\thispagestyle{empty}~ %
+   \newpage % New page right
+   \thispagestyle{empty}
+   \clearpage
+   \pagenumbering{arabic}}
+
+\usepackage[margin=10pt,format=plain,font=small,labelfont=bf]{caption}
+
+% hyperref for PDF
+\usepackage[
+    bookmarks,
+    colorlinks=true,
+ 	%bookmarksnumbered,
+    bookmarksopen=true,
+ 	bookmarksopenlevel=1,
+ 	%
+	linkcolor=black,
+	citecolor=blue,
+	urlcolor=blue,
+	filecolor=black,
+    anchorcolor=black,
+	%
+	pdfstartview=FitH,
+	pdfpagelayout=OneColumn,
+	plainpages=false,
+	pdfpagelabels,
+    %hypertexnames=false,
+    linktocpage,
+]{hyperref}
+
+\usepackage{url}
+%\usepackage{pdfpages}
+
+\usepackage{ccicons}
+
+%\usepackage[square]{natbib}
+%\bibliographystyle{natdin} %plainnat geralpha
+
+\renewcommand\bibname{References} 
+
+% Neue Commands und Umgebungen
+\newcommand{\ARP}{\texttt{\textbf{{\small ARPACK}}}}
+\newcommand{\ARPP}{\texttt{\textbf{{\small ARPACK++}}}}
+\newcommand{\BLAS}{\texttt{\textbf{{\small BLAS}}}}
+\newcommand{\LAP}{\texttt{\textbf{{\small LAPACK}}}}
+
+% Table styles
+\renewcommand{\arraystretch}{1.5}
+\newcolumntype{L}{>{\ttfamily}l}

@@ -1,0 +1,873 @@
+\chapter{ARPACK++ examples}
+
+This chapter contains some examples on how to use \ARPP{}. The purpose of these examples is to illustrate the major characteristics of the software and to clarify the steps required to find eigenvalues and eigenvectors mentioned in the last chapter.
+
+Several combinations of matrix classes, eigenvalue problems and output functions are considered here. Problems where \ARPP{} matrix classes are used are presented first, followed by some examples that involve user-defined matrix-vector products and the reverse communication interface. Some strategies to build an interface between \ARPP{} and other libraries are also briefly mentioned.
+
+\section{The examples directory}
+
+The problems mentioned in this chapter are also distributed as examples along with \ARPP{} code. The \texttt{arpack++/examples} directory contains some subdirectories - such as superlu, product, umfpack, harwell, dense, band and reverse - that include several sample programs covering all available spectral transformations for real symmetric, real nonsymmetric and complex problems. Although the purpose of these programs is only to illustrate \ARPP{} usage, they can also be employed to create new problems. The user just needs to replace the matrix data or the matrix-vector product functions.
+
+Some instructions on how to run these examples are given in \texttt{README} files included in all of the example directories. The required \texttt{Makefiles} are also supplied. However, prior to compiling the programs, some modifications should be made to the \texttt{Makefile.inc} file in order to correctly define the compiler and the path of the libraries referenced by \ARPP{} (see chapter one).
+
+\section{Using ARPACK++ matrix structure}
+
+Complex and real symmetric and nonsymmetric eigenvalue problems can be easily solved by \ARPP{} when matrix elements are stored in compressed sparse column (CSC) or band format (or sequentially in a vector, if the matrix is dense). In this case, only a few commands are required to obtain the desired eigenvalues and eigenvectors. To illustrate this, three different examples were included in this section. In the first, a real symmetric generalized problem is solved by using the Cayley mode. The second contains a complex standard problem that is solved in regular mode. Finally, \ARPP{} is also used to find some singular values of a real nonsymmetric matrix.
+
+\subsection{Solving a symmetric generalized eigenvalue problem}
+
+In this first example, the Cayley mode\footnote{See chapter 4 for a description of all computational modes available in \ARPP{}.} is used to find the four eigenvalues nearest to 150 of a generalized symmetric problem in the form $Ax = Bx\lambda$ , where $A$ is the one-dimensional discrete Laplacian on the interval $[0, 1]$, with zero Dirichlet boundary conditions, and $B$ is the mass matrix formed by using piecewise linear elements on the same interval. Both matrices are tridiagonal. This example is very similar to the one found in the \texttt{examples/band/sym/bsymgcay.cc} file.
+
+\paragraph{1. Generating problem data.}
+
+Before generating A and B, it is worth noticing that, being symmetric, these matrices can be perfectly characterized by their upper or their lower triangular part. Therefore, some memory can be saved if only one of the upper or lower triangular parts of the matrix is stored.
+
+Two functions, \texttt{MatrixA} and \texttt{MatrixB}, will be used here to create A and B, respectively. These functions have two input parameters:
+\begin{itemize}
+	\item \texttt{n}, the dimension of the system; and 
+	\item \texttt{uplo}, a parameter that indicates which part of the matrix will be supplied;
+\end{itemize}
+and two output parameters,
+\begin{itemize}
+	\item \texttt{nD}, the number of upper or lower nonzero diagonals (not including the main diagonal);
+	\item \texttt{A}, a pointer to a vector that contains the nonzero matrix elements.
+\end{itemize}
+
+These output parameters are the minimum amount of information required by \ARPP{} to store a matrix as an \texttt{ARbdSymMatrix} object, so it can be used later to create an eigenvalue problem.
+
+Since the dimension of the vector pointed by A depends on \texttt{nD}, a parameter that is not known in advance by the user, \texttt{MatrixA} and \texttt{MatrixB} also allocate memory for this vector, as shown below.
+
+\begin{cppcode}
+template<class FLOAT, class INT>
+void MatrixA(INT n, INT& nD, FLOAT* &A, char uplo = 'L')
+{
+	// Declaring internal variables.
+	INT    i;
+	FLOAT  h, df, dd;
+	
+	// Defining constants.
+	h  = 1.0/FLOAT(n+1);   // mesh size.
+	dd = 2.0/h;            // using 2/h instead of 2/h^2.
+	df = -1.0/h;           // using 1/h instead of 1/h^2.
+	
+	// Defining the upper (or lower) bandwidth.
+	nD  = 1;
+	
+	// Creating output vector A.
+	A   = new FLOAT[2*n];
+	
+	if (uplo == 'L') {   // Storing the lower triangular part of A.
+		
+		for (i=0; i<n; i++) {
+			A[2*i] = dd;                // Main diagonal element.
+			if (n-i-1) A[2*i+1] = df;   // Lower diagonal element.
+		}
+	}
+	else {               // Storing the upper triangular part of A.
+		
+		for (i=0; i<n; i++) {
+			if (i) A[2*i]  = df;        // Upper diagonal element.
+			A[2*i+1] = dd;              // Main diagonal element.
+		}
+	}
+} // MatrixA.
+
+template<class FLOAT, class INT>
+void MatrixB(INT n, INT& nD, FLOAT* &A, char uplo = 'L')
+{
+	// Declaring internal variables.
+	INT    i;
+	FLOAT  h, df, dd;
+	
+	// Declaring constants.
+	h  = 1.0/FLOAT(n+1);
+	dd = (4.0/6.0)*h;
+	df = (1.0/6.0)*h;
+	
+	// Defining the upper (or lower) bandwidth.
+	nD  = 1;
+	
+	// Creating output vector A.
+	A   = new FLOAT[2*n];
+	
+	if (uplo == 'L') {   // Storing the upper triangular part of B.
+		
+		for (i=0; i<n; i++) {
+			A[2*i] = dd;                // Main diagonal element.
+			if (n-i-1) A[2*i+1] = df;   // Lower diagonal element.
+		}
+	}
+	else {               // Storing the upper triangular part of B.
+		
+		for (i=0; i<n; i++) {
+			if (i) A[2*i] = df;         // Upper diagonal element.
+			A[2*i+1] = dd;              // Main diagonal element.
+		}
+	}
+} // MatrixB.
+\end{cppcode}
+
+\texttt{MatrixA} and \texttt{MatrixB} were defined here as function templates. The first template parameter, \texttt{FLOAT}, permits the function to create both single and double precision matrices. The second parameter, \texttt{INT}, represents the integer type used and must be set to \texttt{int} or \texttt{long int}. 
+
+Since these functions do not make clear how a band symmetric matrixband format can be stored in a single vector, this will be illustrated by the example given below. 
+
+Consider the matrix
+\[M=\left[\begin{array}{cccccc} {a_{11} } & {a_{12} } & {a_{13} } & {0} & {0} & {0} \\ {a_{21} } & {a_{22} } & {a_{23} } & {a_{24} } & {0} & {0} \\ {a_{31} } & {a_{32} } & {a_{33} } & {a_{34} } & {a_{35} } & {0} \\ {0} & {a_{42} } & {a_{43} } & {a_{44} } & {a_{45} } & {a_{46} } \\ {0} & {0} & {a_{53} } & {a_{54} } & {a_{55} } & {a_{56} } \\ {0} & {0} & {0} & {a_{64} } & {a_{65} } & {a_{66} } \end{array}\right].\]
+\textit{M} is a generic $6\times 6$ symmetric band matrix, with bandwidth 5, i.e. with 5 nonzero diagonals. Due to the symmetry, elements $a_{ij}$ and $a_{ji}$ are equal, which means that only the upper or lower nonzero \textit{diagonals} of \textit{M} are required to describe it.
+
+Rewriting the 3 upper nonzero diagonals (including the main diagonal) of \textit{M} as a rectangular $3\times 6$ matrix, one obtains:
+\[M_{upper} =\left[\begin{array}{cccccc} {0} & {0} & {a_{13} } & {a_{24} } & {a_{35} } & {a_{46} } \\ {0} & {a_{12} } & {a_{23} } & {a_{34} } & {a_{45} } & {a_{56} } \\ {a_{11} } & {a_{22} } & {a_{33} } & {a_{44} } & {a_{55} } & {a_{66} } \end{array}\right].\]
+Notice that a few zeros were introduced in \textit{M${}_{upper}$}, due to the fact that some diagonals contain more elements than others.
+
+Once $M_{upper}$. is available, it is easy to store this matrix, by columns, in a single vector, say $\bar{M}_{upper} $:
+\[\bar{M}_{upper} =[0\ 0\ a_{11}\ 0\ a_{12}\ a_{22}\ a_{13}\ a_{23}\ a_{33}\ a_{24}\ a_{34}\ a_{44}\ a_{35}\ a_{45}\ a_{55}\ a_{46}\ a_{56}\ a_{66} ].\] 
+A very similar procedure can be used to store the lower triangular part of \textit{M}. In this case, a $3\times 6$ rectangular matrix \textit{M${}_{lower}$} and a vector$\bar{M}_{upper} $ are generated, as shown below:
+\[M_{lower} =\left[\begin{array}{cccccc} {a_{11} } & {a_{22} } & {a_{33} } & {a_{44} } & {a_{55} } & {a_{66} } \\ {a_{21} } & {a_{32} } & {a_{43} } & {a_{54} } & {a_{65} } & {0} \\ {a_{31} } & {a_{42} } & {a_{53} } & {a_{64} } & {0} & {0} \end{array}\right],\] 
+\[\bar{M}_{lower} =[a_{11}\ a_{21}\ a_{31}\ a_{22}\ a_{32}\ a_{42}\ a_{33}\ a_{43}\ a_{53}\ a_{44}\ a_{54}\ a_{64}\ a_{55}\ a_{65}\ 0\ a_{66}\ 0\ 0].\] 
+Both functions, MatrixA and MatrixB, permits the user to choose between storing the lower or the upper triangular part of the matrix. If this information is not supplied by the user, uplo is set to 'L'. 
+
+\paragraph{2. Defining the main program.}
+
+Once \texttt{MatrixA} and \texttt{MatrixB} are available, it is now easy to write a program that solves an eigenvalue problem in Cayley mode.
+
+A simple example is shown below. In this example, after calling both functions defined above, matrices A and B are declared as two \texttt{ARbdSymMatrix} objects. Then, class \texttt{ARluSymGenEig} is used to create a generalized problem\footnote{Since \texttt{ARluSymGenEig} calls the SuperLU library to solve the linear system $(A-\sigma B)w = v$ when the Cayley mode is being used, this library is supposed to be available.}, prob. Finally, function \texttt{EigenValVectors} is called to determine eigenvalues and eigenvectors.
+
+The parameters that are passed to the constructor of \texttt{ARluSymGenEig} are:
+\begin{itemize}
+	\item The computational mode that should be used to solve the problem (’C’ is passed, which means that the Cayley mode is to be used);
+	\item The number of eigenvalues sought (\texttt{nev});
+	\item The matrices that define the problem (A and B); and
+	\item The shift (150.0).
+\end{itemize}
+
+\begin{cppcode}
+#include "arbsmat.h"   // ARbdSymMatrix definition.
+#include "arbgsym.h"   // ARluSymGenEig definition.
+
+main()
+{
+	// Declaring input variables;
+	int     n;           // Dimension of the problem.
+	int     nev;         // Number of eigenvalues sought.
+	int     nsdiagA;     // Lower (and upper) bandwidth of A.
+	int     nsdiagB;     // Lower (and upper) bandwidth of B.
+	double* valA;        // pointer to an array that stores the nonzero elements of A.
+	double* valB;        // pointer to an array that stores the nonzero elements of B.
+	
+	// Creating matrices A and B.
+	n   = 100;
+	MatrixA(n, nsdiagA, valA);
+	ARbdSymMatrix<double> A(n, nsdiagA, valA);
+	
+	MatrixB(n, nsdiagB, valB);
+	ARbdSymMatrix<double> B(n, nsdiagB, valB);
+	
+	// Defining the eigenvalue problem. 
+	nev = 4;
+	ARluSymGenEig<double> prob('C', nev, A, B, 150.0);
+	
+	// Declaring output variables.
+	int     nconv;                      // Number of converged eigenvalues.
+	double* EigVal = new double[nev];   // Eigenvalues.
+	double* EigVec = new double[nev*n]; // Eigenvectors.
+	
+	// Finding and storing eigenvalues and eigenvectors.
+	nconv = prob.EigenValVectors(EigVec, EigVal); 
+	
+	// ... 
+	
+} // main.
+\end{cppcode}
+
+In this example, the four eigenvalues nearest to 150 are determined and stored in \texttt{EigVal}. The corresponding eigenvectors are also stored sequentially in an array called \texttt{EigVec}.
+
+\texttt{EigVec} was dimensioned here to store n*nev elements, where nev is the number of eigenvectors and n is the size of each one of them. For complex problems, a complex vector with nev*n elements is also sufficient. On the other hand, real nonsymmetric problems require a real vector with (nev+1)*n components, since some of the eigenvectors might be complex (see the description of \texttt{EigenValVectors} in the appendix). 
+
+\subsection{Solving a complex standard eigenvalue problem}
+
+To illustrate how to declare and solve a problem where the matrix is supplied using the compressed sparse column format, a standard complex eigenvalue problem will now be considered. In this example, the regular mode is used to find the four eigenvalues with largest magnitude of the block tridiagonal matrix \textit{A} derived from the central-difference discretization of the two-dimensional convection-diffusion operator 
+\[-\Delta u+\rho \nabla u\] 
+on the unit square $[0,1]\times [0,1]$, with zero Dirichlet boundary conditions. Here, $\Delta $ represents the Laplacian operator, and $\nabla $ the gradient. $\rho $ is a complex parameter. A similar example can be found in the \texttt{examples/superlu/complex/lcompreg.cc} file.
+
+\paragraph{Generating problem data.}
+
+A function, called \texttt{MatrixA}, will be used here to generate \textit{A} in CSC format. This matrix has the form: 
+\[A=\frac{1}{h^{2} } \left[\begin{array}{ccccc} {T} & {-I} & {0} & {\cdots } & {0} \\ {-I} & {T} & {\ddots } & {\ddots } & {\vdots } \\ {0} & {\ddots } & {\ddots } & {\ddots } & {0} \\ {\vdots } & {\ddots } & {\ddots } & {T} & {-I} \\ {0} & {\cdots } & {0} & {-I} & {T} \end{array}\right]\] 
+where \textit{h} is the mesh size, \textit{I} is the identity matrix and \textit{T} is a tridiagonal matrix with 4 on the main diagonal, $(-1-\rho h/2)$ on the subdiagonal and $(-1+\rho h/2)$ on the superdiagonal.
+
+\texttt{MatrixA} has only one input parameter:
+\begin{itemize}
+	\item \texttt{nx}, the mesh size;
+\end{itemize}
+and five output parameters, 
+\begin{itemize}
+	\item \texttt{n}, the matrix dimension;
+	\item \texttt{nnz}, the number of nonzero elements in A;
+	\item \texttt{A}, a pointer to a vector that contains all nonzero matrix elements;
+	\item \texttt{irow}, a pointer to a vector that contains the row indices of the nonzero elements stored in A; and
+	\item \texttt{pcol}, a pointer to a vector that contain pointers to the first element in each column stored in A and irow.
+\end{itemize}
+
+These output parameters will be used later to store matrix A as an \texttt{ARluNonSymMatrix} object. 
+As in the first example of this chapter, a function template is used to define \texttt{MatrixA}:
+
+\begin{cppcode}
+template<class FLOAT, class INT>
+void MatrixA(INT nx, INT& n, INT& nnz, arcomplex<FLOAT>* &A, 
+INT* &irow, INT* &pcol)
+{
+	// Declaring internal variables.
+	INT              i, j, k, id;
+	arcomplex<FLOAT> h, h2, dd, dl, du, f;
+	
+	// Defining constants.
+	const arcomplex<FLOAT> half(0.5, 0.0);
+	const arcomplex<FLOAT> one(1.0, 0.0);
+	const arcomplex<FLOAT> four(4.0, 0.0);
+	const arcomplex<FLOAT> rho(1.0e2, 0.0);
+	
+	h   = one/arcomplex<FLOAT>(nx+1, 0);  // mesh size.
+	h2  = h*h;
+	f   = -one/h2;
+	dd  = four/h2;                       
+	dl  = f - half*rho/h;                
+	du  = f + half*rho/h;
+	
+	// Defining the number of columns and nonzero elements in A.
+	n   = nx*nx;
+	nnz = (5*nx-4)*nx;
+	
+	// Creating output vectors.
+	A    = new arcomplex<FLOAT>[nnz];
+	irow = new INT[nnz];
+	pcol = new INT[nx*nx+1];
+	
+	// Defining matrix A.
+	pcol[0] = 0;
+	j       = 0;
+	id      = 0;
+	
+	for (k=0; k!=nx; k++) {
+		for (i=0; i!=nx; i++) {
+			
+			if (k) {
+				irow[j] = id-nx; 
+				A[j++]  = f;       // A(i-nx,i) = f.
+			}
+			
+			if (i) {
+				irow[j] = id-1;
+				A[j++]  = du;      // A(i-1,i) = du.
+			}
+			
+			irow[j]   = id;
+			A[j++]    = dd;        // A(i,i) = dd.
+			
+			if (i!=(nx-1)) {
+				irow[j] = id+1;
+				A[j++]  = dl;      // A(i+1,i) = dl.
+			}
+			
+			if (k!=(nx-1)) {
+				irow[j] = id+nx;
+				A[j++]  = f;       // A(i+nx,i) = f.
+			}
+			
+			pcol[++id]= j;
+		}
+	}
+} // MatrixA.
+\end{cppcode}
+
+\paragraph{2. Defining the main program.}
+
+Now that the matrix data is available, it is time to write the main program. To create a complex standard eigenvalue problem, two \ARPP{} classes will be required. One, \texttt{ARluNonSymMatrix}, to define A as the matrix represented by \{\texttt{n}, \texttt{nnz}, \texttt{valA}, \texttt{irow}, \texttt{pcol}\}, and the other, \texttt{ARluCompStdEig}, to declare prob as the problem to be solved and to set some parameters.
+
+As shown below, only two parameters are passed to the constructor of \texttt{ARluCompStdEig} in this case. The first is the number of desired eigenvalues. The second is the matrix. No other information is required, since the default values supplied by \ARPP{} for the other parameters are adequate.
+
+\begin{cppcode}
+#include "arlnsmat.h" // ARluNonSymMatrix definition.
+#include "arlscomp.h" // ARluCompStdEig definition.
+
+main()
+{
+	// Declaring problem data.
+	int                nx;
+	int                n;      // Dimension of the problem.
+	int                nnz;    // Number of nonzero elements in A.
+	int*               irow;   // pointer to an array that stores the row
+	                           // indices of the nonzeros in A.
+	int*               pcol;   // pointer to an array of pointers to the
+	                           // beginning of each column of A in valA.
+	arcomplex<double>*   valA; // pointer to an array that stores the
+	                           // nonzero elements of A.
+	
+	// Creating a complex matrix.
+	nx = 10;
+	MatrixA(nx, n, nnz, valA, irow, pcol);
+	ARluNonSymMatrix<arcomplex<double>, double> A(n, nnz, valA, irow, pcol);
+	
+	// Defining the eigenvalue problem. 
+	ARluCompStdEig<double> prob(4, A); 
+	
+	// Declaring output variables.
+	vector<double>* EigVal;   // Eigenvalues.
+	vector<double>* EigVec;   // Eigenvectors.
+	
+	// Finding eigenvalues and eigenvectors.
+	EigVec = prob.StlEigenvectors();
+	EigVal = prob.StlEigenvalues();
+	
+	// ...
+} // main.
+\end{cppcode}
+
+In this example, the four eigenvalues and the corresponding eigenvectors with largest magnitude of A were found by using function \texttt{StlEigenvectors}. The eigenvectors were stored sequentially in an STL vector called \texttt{EigVec}, which was internally dimensioned by \ARPP{} to store 4*n elements. \texttt{StlEigenvalues} was used to store the eigenvalues in \texttt{EigVal}.
+
+As it will become clear in the Working with user-defined matrix-vector products section below, it is not necessary for the user to supply arrays such as \texttt{EigVec} and \texttt{EigVal} when solving eigenvalue problems. \ARPP{} can handle eigenvalues and eigenvectors using its own data structure. In this case, \texttt{FindEigenvectors} should replace \texttt{StlEigenvectors}, and one of the several output functions provided by the software (\texttt{Eigenvalue} and \texttt{RawEigenvector} are just two examples) used to recover the solution.
+
+\subsection{Solving truncated SVD problems}
+
+In the last example of this section, \ARPP{} will be used to obtain the some of the singular values of a real nonsymmetric matrix. As described in chapter four, the truncated singular value decomposition of a generic real rectangular matrix A can be obtained by finding the eigenvalues and eigenvectors of the symmetric $n\times n$ matrix $A^{T}A$\footnote{Supposing that $m$ is greater or equal to $n$. If $m < n$, $AA^T$ must be formed instead of $A^{T}A$. For a complete description of all schemes provided by \ARPP{} to find singular values and vectors, the user should refer to chapter four.}. In this case, the eigenvalues of this matrix are precisely the singular values of A squared, while the eigenvectors are the right singular vectors of A.
+
+\paragraph{1. Generating problem data.}
+
+A function template, \texttt{RectangularMatrix}, is used below to generate a very simple $2n\times n$ matrix in the form 
+\[A=\left[\begin{array}{c} {T} \\ {T} \end{array}\right], \] 
+where T is a tridiagonal matrix with 4 on the main diagonal, 1 on the subdiagonal and 2 on the superdiagonal. 
+
+The function takes one input parameter:
+
+\begin{itemize}
+	\item \texttt{n}, the number of columns of A,
+\end{itemize}
+and return five parameters:
+\begin{itemize}
+	\item \texttt{m}, the number of rows of A;
+	\item \texttt{nnz}, the number of nonzero elements in A;
+	\item \texttt{A}, a pointer to a vector that contains all nonzero matrix elements;
+	\item \texttt{irow}, a pointer to a vector that contains the row indices of the nonzero elements stored in A; and
+	\item \texttt{pcol}, a pointer to a vector that contain pointers to the first element in each column stored in A and irow.
+\end{itemize}
+
+\begin{cppcode}
+template<class FLOAT, class INT>
+void RectangularMatrix(INT n, INT& m, INT& nnz, FLOAT* &A, 
+	INT* &irow, INT* &pcol)
+{
+	// Declaring internal variables.
+	INT   i, j;
+	FLOAT dd, dl, du;
+	
+	// Defining constants.
+	dl = 1.0;
+	dd = 4.0;
+	du = 2.0;
+	
+	// Defining the number of rows and nonzero elements in A.
+	nnz =  n*6-2;
+	m   =  n*2;
+	
+	// Creating output vectors.
+	A    = new FLOAT[nnz];
+	irow = new INT[nnz];
+	pcol = new INT[n+1];
+	
+	// Defining A.
+	pcol[0] = 0;
+	j = 0;
+	
+	for (i=0; i!=n; i++) {
+		
+		if (i != 0) {
+			irow[j] = i-1;
+			A[j++]  = du;
+		}
+		
+		irow[j] = i;
+		A[j++]  = dd;
+		
+		irow[j] = i+1;
+		A[j++]  = dl;
+		
+		irow[j] = i+n-1;
+		A[j++]  = dl;
+		
+		irow[j] = i+n;
+		A[j++]  = dd;
+		
+		if (i != (n-1)) {
+			irow[j] = i+n+1;
+			A[j++]  = du;
+		}
+		
+		pcol[i+1] = j;
+		
+	}
+	
+} // Rectangular matrix.
+\end{cppcode}
+
+\paragraph{2. Defining the main program.}
+The main program listed below shows how to find some of the largest and smallest singular values of A, and how the two-norm condition number of the matrix can be calculated.
+
+\begin{cppcode}
+#include "arssym.h"    // ARSymStdEig class definition.
+#include "arlnsmat.h"  // ARluNonSymMatrix class definition.
+#include <math.h>      // sqrt function declaration. 
+
+main()
+{
+	// Declaring variables;
+	int     m;          // Number of rows in A.
+	int     n;          // Number of columns in A.
+	int     nnz;        // Number of nonzero elements in A.
+	int     nconv;      // Number of "converged eigenvalues".
+	int*    irow;       // pointer to an array that stores the row
+	                    // indices of the nonzeros in A.
+	int*    pcol;       // pointer to an array of pointers to the
+	                    // beginning of each column of A in valA.
+	double* valA;       // pointer to an array that stores the
+	                    // nonzero elements of A.
+	double  cond;       // Condition number of A.
+	double  svalue[6]   // Singular values.
+	
+	// Creating a rectangular matrix with m = 200 and n = 100.
+	n = 100;
+	RectangularMatrix(n, m, nnz, valA, irow, pcol);
+	
+	// Using ARluNonSymMatrix to store matrix information
+	// and to perform the product A'Ax.
+	ARluNonSymMatrix<double, double> A(m, n, nnz, valA, irow, pcol);
+	
+	// Defining what we need: eigenvalues from both ends of the spectrum.
+	ARSymStdEig<double, ARluNonSymMatrix<double, double>>
+		prob(n, 6, &A, &ARluNonSymMatrix<double, double>::MultMtMv, "BE", 20);
+	
+	// Finding eigenvalues.
+	nconv = prob.Eigenvalues(svalue);
+	
+	// Calculating singular values and the condition number.
+	for (int i=0; i<nconv; i++) svalue[i] = sqrt(svalue[i]);
+	cond = svalue[5]/svalue[0];
+	
+	// ...
+	
+} // main.
+\end{cppcode}
+
+In this program, the output parameters generated by function \texttt{RectangularMatrix} were used to store matrix A as an object of class \texttt{ARluNonSymMatrix}\footnote{Class \texttt{ARumNonSymMatrix} can also be used. Or even \texttt{ARbdNonSymMatrix}, if the matrix is stored in band format.}. This class was chosen because it contains a function, called \texttt{MultMtMv}, that performs the matrix-vector product $w\leftarrow A^{T}Av$, required to solve the eigenvalue problem.
+
+After storing matrix data, class \texttt{ARSymStdEig} was used to declare a variable, \texttt{prob}, that represents the real symmetric eigenvalue problem defined by $A^{T}A$. Six parameters were passed to the constructor of this class:
+\begin{itemize}
+	\item The dimension of the system (n);
+	\item The number of eigenvalues sought (6);
+	\item The matrix (A);
+	\item The function that performs the matrix-vector product $w\leftarrow A^{T}Av$ (\texttt{MultMtMv});
+	\item The desired part of the spectrum (”BE” is passed here, which means that eigenvalues from both ends of the spectrum are sought).
+	\item the number of Arnoldi vectors generated at each iteration (see the description of \texttt{ncv} on the appendix).
+\end{itemize}
+
+The eigenvalues of $A^{T}A$ were determined by function \texttt{Eigenvalues} and stored in a vector called \texttt{svalue}. After computing the square roots of the elements of svalue, the largest and the smallest singular values - \texttt{svalue[0]} and \texttt{svalue[6]}, respectively - were used to calculate the condition number of A.
+
+\section{Working with user-defined matrix-vector products}
+
+This section contains a very simple nonsymmetric standard eigenvalue that illustrates how to define a class that includes a matrix-vector product as required by \ARPP{} and also how this class can be used to obtain eigenvalues and eigenvectors.
+
+\subsection{Creating a matrix class}
+
+The objective of this simple example is to obtain the eigenvalues and eigenvectors of the matrix A derived from the standard central difference discretization of the one-dimensional convection-diffusion operator $-u'' + \rho u'$ on the interval $[0,1]$, with zero Dirichlet boundary conditions. This matrix is nonsymmetric and has a tridiagonal form, with $4/h^2$ as the main diagonal elements, $-1/h^2-\rho/(2h)$ in the subdiagonal and $-1/h^2+\rho/(2h)$ on the superdiagonal, where $h$ is the mesh size. 
+
+Before defining an eigenvalue problem using \ARPP{}, it is necessary to build at least one class that includes the required matrix-vector product as a member function. This class could be called \texttt{NonSymMatrix}, for example, and the name of the function could be \texttt{MultMv}.
+
+It is better to declare \texttt{NonSymMatrix} as a class template, in order to permit the eigenvalue problem to be solved in single or double precision. So, hereafter, parameter \texttt{T} will designate one of the c++ predefined types float or double. \texttt{NonSymMatrix} can contain variables and functions other than \texttt{MultMv}. The only requirements made by \ARPP{} are that \texttt{MultMv} must have two pointers to vectors of type \texttt{T} as parameters and the input vector must precede the output vector. The class definition is shown below.
+
+\begin{cppcode}
+template<class T>
+class NonSymMatrix {
+	/*
+	This simple class exemplifies how to create a matrix class that
+	can be used by ARPACK++. Basically, NonSymMatrix is required to 
+	have a member function that calculates the matrix-vector product
+	NonSymMatrix*v, where v is a vector with elements of type T.
+	*/
+	
+	private:
+	
+	int m, n;
+	
+	public:
+	
+	int ncols() { return n; }
+	
+	// Function that returns the dimension of the matrix.
+	void MultMv(T* v, T* w)
+	/*
+	Function that performs the product w <- A*v for the matrix A
+	derived from the standard central difference discretization of
+	the 1-dimensional convection diffusion operator u" + rho*u' on
+	the interval [0, 1], with zero Dirichlet boundary conditions.
+	A is scaled by h^2 in this example.
+	*/
+	{
+		int  j;
+		T    dd, dl, du, h;
+		
+		h  = 1.0/T(ncols()+1);
+		dd = -4.0/h*h;
+		dl = -1.0/h*h - 0.5*rho/h;
+		du = -1.0/h*h + 0.5*rho/h;
+		
+		w[0] = dd*v[0] + du*v[1];
+		for (j=1; j<ncols()-1; j++) {
+			w[j] = dl*v[j-1] + dd*v[j] + du*v[j+1];
+		}
+		w[ncols()-1] = dl*v[ncols()-2] + dd*v[ncols()-1];
+		
+		return;
+		
+	} // MultMv
+	
+	NonSymMatrix(int nval) { n = nval; } 
+	// Constructor.
+	
+}; // NonSymMatrix.
+\end{cppcode}
+
+\subsection{Solving the eigenvalue problem}
+
+Once defined the matrix-vector product, it is necessary to create a matrix that belongs to class \texttt{NonSymMatrix}, and also an object of class \texttt{ARNonSymStdEig}. After that, the desired number of eigenvalues can be obtained by calling function \texttt{FindEigenvectors}.
+
+Because \texttt{ARNonSymStdEig} was declared as a template by \ARPP{}, some parameters must be used to create a specific class when the program is compiled. In this example, those parameters are set to double, the type of the elements of matrix A, and to \texttt{NonSymMatrix<double>}, the name of the class that handles the matrix-vector product.
+
+Besides that, the constructor of class \texttt{ARNonSymStdEig} also accepts some parameters, such as the dimension of the eigenvalue system (\texttt{A.ncols}), the number of desired eigenvalues (4), an object of class \texttt{NonSymMatrix<double>} (A), the address of the function that evaluates the matrix-vector product (\texttt{\&NonSymMatrix<double>::MultMv}) and the portion of the spectrum that is sought (”SM”, which means the eigenvalues with smallest magnitude). Other options and parameters (not used here) are described in the appendix.
+
+\begin{cppcode}
+#include "arsnsym.h"
+
+main()
+{
+	int nconv;
+	
+	// Creating a double precision 100x100 matrix.
+	NonSymMatrix<double> A(100);
+	
+	// Creating an eigenvalue problem and defining what we need: 
+	// the four eigenvectors of A with smallest magnitude.
+	ARNonSymStdEig<double, NonSymMatrix<double> >
+	dprob(A.ncols(), 4, &A, &NonSymMatrix<double>::MultMv, "SM");
+	
+	/*
+	It is possible to pass other parameters directly to the
+	constructor of class ARNonSymStdEig in order to define a
+	problem. The list of parameters includes, among other values,
+	the maximum number of iterations allowed and the relative 
+	accuracy used to define the stopping criterion. Alternatively, 
+	it is also possible to use function DefineParameters to set 
+	ARPACK++ variables after declaring dprob as an object of 
+	class ARNonSymStdEig using the default constructor.
+	*/
+	
+	// Finding eigenvectors.
+	nconv = dprob.FindEigenvectors();
+	
+	// Printing the solution.
+	Solution(A, dprob);
+	
+} // main.
+\end{cppcode}
+
+\section{Using the reverse communication interface}
+
+\ARPP{} provides a somewhat simple structure for handling eigenvalue problems. However, sometimes it is inconvenient to explicitly define a function that evaluates a matrix-vector product using the format required by the above mentioned classes. 
+To deal with such cases, \ARPP{} also includes a set of classes and functions that allow the user to perform matrix-vector products on his own. This structure is called the \textit{reverse communication interface} and is derived from the FORTRAN version of the software.
+
+Although this interface gives the user some freedom, it requires a step-by-step execution of \ARPP{}. Therefore, to find an Arnoldi basis it is necessary to define a sequence of calls to a function called \texttt{TakeStep} combined with matrix-vector products until convergence is attained.
+
+One example that illustrates the use of these classes is given below The matrix used in this example, say A, is real and symmetric. It is not defined by a class, but only by the function \texttt{MultMv} that performs the product $y\leftarrow Ax$. A slightly different version of this program can be found in directory \texttt{examples/reverse/sym}.
+
+\begin{cppcode}
+#include "arrssym.h"
+
+template<class T> 
+void MultMv(int n, T* v, T* w)
+/*
+Function that evaluates the matrix-vector product w <- A*v,
+where A is the one dimensional discrete Laplacian on
+the interval [0,1] with zero Dirichlet boundary conditions. 
+*/
+{
+	
+	int  j;
+	T    h2;
+	
+	w[0] =  2.0*v[0] - v[1];
+	for (j=1; j<n-1; j++) {
+		w[j] = - v[j-1] + 2.0*v[j] - v[j+1];
+	}
+	w[n-1] = - v[n-2] + 2.0*v[n-1];
+	
+	// Scaling vector w by (1/h^2) using blas routine scal.
+	
+	h2 = T((n+1)*(n+1));
+	scal(n, h2, w, 1L);
+	
+} // MultMv
+
+main()
+{
+	// Declaring matrix A.
+	SymMatrixA<double> A(100); // n = 100.
+	
+	// Creating a symmetric eigenvalue problem and defining what
+	// we need: the four eigenvectors of A with largest magnitude.
+	ARrcSymStdEig<double> prob(A.ncols(), 4L);
+	
+	// Finding an Arnoldi basis. 
+	while (!prob.ArnoldiBasisFound()) {
+		
+		// Calling ARPACK fortran code. Almost all work needed to
+		// find an Arnoldi basis is performed by TakeStep.
+		prob.TakeStep();
+		
+		if ((prob.GetIdo() == 1)||(prob.GetIdo() == -1)) {
+			
+			// Performing the matrix-vector product.
+			// GetIdo indicates which product must be performed
+			// (in this case, only y <- Ax).
+			// GetVector supplies a pointer to the input vector
+			// and Put vector a pointer to the output vector.
+			A.MultMv(prob.GetVector(), prob.PutVector());
+		}
+	}
+	
+	// Finding eigenvalues and eigenvectors. 
+	prob.FindEigenvectors();
+	
+	// ...
+	
+} // main.
+\end{cppcode}
+
+In the above example, the definition of the eigenvalue problem was made without any mention to the matrix class. Because of that, \ARPP{} was not able to handle the matrix-vector products needed by the Arnoldi process and it was necessary to include a \texttt{while} statement in the main program in order to iteratively find an Arnoldi basis. Only after that, \texttt{FindEigenvectors} was called to find eigenvalues and eigenvectors.
+
+In this iterative search for an Arnoldi basis, \texttt{TakeStep} was used to perform almost all work needed by the algorithm. Only the product $y\leftarrow Ax$ was left to the user. When solving a generalized eigenvalue problem, however, at least two different matrix-vector products must be performed, and the \texttt{GetIdo} function should be used to determine which product must be taken after each call to \texttt{TakeStep}.
+
+Some other useful \ARPP{} functions included in the example are \texttt{GetVector}, \texttt{PutVector} and \texttt{ArnoldiBasisFound}. \texttt{GetVector} and \texttt{PutVector} are two functions that return pointers to the exact position where, respectively, x, the input vector, and y, the output vector of the matrix-vector product, are stored. \texttt{ArnoldiBasisFound} is used to detect if the desired eigenvalues have attained the desired accuracy.
+
+Finally, it is worth mentioning that, although no output command was included in the above program, functions such as \texttt{EigenValVectors}, \texttt{RawEigenvectors}, \texttt{StlEigenvalues} and Eigenvalue are also available when using the \textit{reverse communication interface}.
+
+\section{Printing some information about eigenvalues and eigenvectors}
+
+The function \texttt{Solution} below illustrates how to use class \texttt{ARNonSymStdEig} to extract information about eigenvalues and eigenvectors from a real nonsymmetric problem. Only a few suggestions are shown here. A complete list of \ARPP{} output functions can be found in the appendix: \ARPP{} reference guide.
+
+\begin{cppcode}
+#include "blas1c.h"   // ARPACK++ version of blas1 routines.
+#include "lapackc.h"  // ARPACK++ version of lapack routines.
+#include "arsnsym.h"
+
+template<class MATRIX, class FLOAT>
+void Solution(MATRIX &A, ARNonSymStdEig<FLOAT, MATRIX> &Prob)
+/*
+This function prints eigenvalues and eigenvectors on 
+standard "cout" stream and exemplifies how to retrieve 
+information from ARPACK++ classes.
+*/
+{
+	int   i, n, nconv, mode;
+	FLOAT *Ax;
+	FLOAT *ResNorm;
+	
+	/*
+	ARPACK++ includes some functions that provide information
+	about the problem. For example, GetN furnishes the dimension
+	of the problem and ConvergedEigenvalues the number of 
+	eigenvalues that attained the required accuracy. GetMode 
+	indicates if the problem was solved in regular, 
+	shift-and-invert or other mode.
+	*/
+	
+	n     = Prob.GetN();
+	nconv = Prob.ConvergedEigenvalues();
+	mode  = Prob.GetMode();
+	
+	cout << "Testing ARPACK++ class ARNonSymStdEig" << endl;
+	cout << "Real nonsymmetric eigenvalue problem: A*x-lambda*x"<< endl;
+	switch (mode) {
+		case 1:
+		cout << "Regular mode" << endl << endl;
+		break;
+		case 3: 
+		cout << "Shift and invert mode" << endl << endl;
+	}
+	
+	cout << "Dimension of the system  : " << n             << endl;
+	cout << "'requested' eigenvalues  : " << Prob.GetNev() << endl;
+	cout << "'converged' eigenvalues  : " << nconv         << endl;
+	cout << "Arnoldi vectors generated: " << Prob.GetNcv() << endl;
+	cout << endl;
+	
+	/*
+	EigenvaluesFound is a boolean function that indicates
+	if the eigenvalues were found or not. Eigenvalue can be
+	used to obtain one of the "converged" eigenvalues. There
+	are other functions that return eigenvectors elements,
+	Schur vectors elements, residual vector elements, etc.
+	*/
+	
+	if (Prob.EigenvaluesFound()) {
+		
+		// Printing eigenvalues.
+		
+		cout << "Eigenvalues:" << endl;
+		for (i=0; i<nconv; i++) {
+			cout << "  lambda[" << (i+1) << "]: " << Prob.EigenvalueReal(i); 
+			if (Prob.EigenvalueImag(i)>=0.0) {
+				cout << " + " << Prob.EigenvalueImag(i) << " I" << endl;
+			}
+			else {
+				cout << " - " << fabs(Prob.EigenvalueImag(i)) << " I" << endl;
+			}
+		}
+		cout << endl;
+	}
+	
+	/*
+	EigenvectorsFound indicates if the eigenvectors are
+	available. RawEigenvector is one of the functions that
+	provide raw access to ARPACK++ output data. Other functions
+	of this type include RawEigenvalues, RawEigenvectors, 
+	RawSchurVector, RawResidualVector, etc.
+	*/
+	
+	if (Prob.EigenvectorsFound()) {
+		
+		// Printing the residual norm || A*x - lambda*x || for the
+		// nconv accurately computed eigenvectors. 
+		// axpy and nrm2 are blas 1 fortran subroutines redefined
+		// as function templates by ARPACK++. The first 
+		// calculates y <- y + a*x, and the second determines the 
+		// two-norm of a vector. lapy2 is the lapack function that 
+		// computes sqrt(x*x+y*y) carefully.
+		
+		Ax      = new FLOAT[n];
+		ResNorm = new FLOAT[nconv+1];
+		
+		for (i=0; i<nconv; i++)
+		{
+			if (Prob.EigenvalueImag(i)==0.0) { // Eigenvalue is real.
+				
+				A.MultMv(Prob.RawEigenvector(i), Ax); 
+				axpy(n,-Prob.EigenvalueReal(i),Prob.RawEigenvector(i),1,Ax,1);
+				ResNorm[i] = nrm2(n, Ax, 1)/fabs(Prob.EigenvalueReal(i));
+			}
+			else { // Eigenvalue is complex.
+				
+				A.MultMv(Prob.RawEigenvector(i), Ax);
+				axpy(n,-Prob.EigenvalueReal(i),Prob.RawEigenvector(i),1,Ax,1);
+				axpy(n,Prob.EigenvalueImag(i),Prob.RawEigenvector(i+1),1,Ax,1);
+				ResNorm[i] = nrm2(n, Ax, 1);
+				A.MultMv(Prob.RawEigenvector(i+1), Ax);
+				axpy(n,-Prob.EigenvalueImag(i),Prob.RawEigenvector(i),1,Ax,1);
+				axpy(n,-Prob.EigenvalueReal(i),Prob.RawEigenvector(i+1),1,Ax,1);
+				ResNorm[i] = lapy2(ResNorm[i],nrm2(n, Ax, 1))/
+				lapy2(Prob.EigenvalueReal(i),Prob.EigenvalueImag(i));
+				ResNorm[i+1] = ResNorm[i];
+				i++;
+			}
+		}
+		
+		for (i=0; i<nconv; i++) {
+			cout << "||A*x(" << (i+1) << ") - lambda(" << (i+1);
+			cout << ")*x(" << (i+1) << ")||: " << ResNorm[i] << endl;
+		}
+		cout << endl;
+		
+		delete[] Ax;
+		delete[] ResNorm;
+	}
+} // Solution
+\end{cppcode}
+
+\section{Building an interface with another library}
+
+More than a c++ version of the ARPACK FORTRAN package, \ARPP{} is intended to be an interface between ARPACK and other mathematical libraries. Virtually all numerical libraries that represent matrices and their operations by means of c++ classes can be linked to \ARPP{}. This is the main reason why class templates were used to define eigenvalue problems.
+
+The simplest way to connect \ARPP{} with another library is to pass a matrix generated by this library as a parameter to one of the classes \texttt{ARNonSymStdEig}, \texttt{ARSymStdEig}, \texttt{ARCompStdEig}, \texttt{ARNonSymGenEig}, \texttt{ARSymGenEig} or \texttt{ARCompGenEig}. In this case, the user can also pass the matrix class as template parameter, so the problem can be solved almost immediately, as shown in the Working with user-defined matrix-vector products section above. This is the best alternative when only a few eigenvalue problems are to be solved. However, if the user intends to solve many eigenvalue problems, it can be worth defining a new class to interface \ARPP{} with the other library.
+
+The creation of a new class is very simple, since most of its member functions can be inherited from other parent classes. As an example, one of the declarations of the \texttt{ARluNonSymStdEig} class is transcribed below. Actually, this is the UMFPACK version of this class, exactly as it is declared in the \texttt{arpack++/include/arusnsym.h} file.
+
+\begin{cppcode}
+/*
+MODULE ARUSNSym.h.
+Arpack++ class ARluNonSymStdEig definition (umfpack version).
+*/
+
+#ifndef ARUSNSYM_H
+#define ARUSNSYM_H
+
+#include "arch.h"       // Machine dependent functions and variable types.
+#include "arsnsym.h"    // ARNonSymStdEig class definition.
+#include "arunsmat.h"   // ARumNonSymMatrix class definition.
+#include <stddef.h>
+
+template<class FLOAT>
+class ARluNonSymStdEig:
+public virtual ARNonSymStdEig<FLOAT, ARumNonSymMatrix<FLOAT, FLOAT>> {
+	
+	public:
+	
+	// a) Public functions:
+	
+	// a.1) Function that allows changes in problem parameters.
+	
+	virtual void ChangeShift(FLOAT sigmaRp);
+	
+	virtual void SetRegularMode();
+	
+	virtual void SetShiftInvertMode(FLOAT sigmap);
+	
+	// a.2) Constructors and destructor.
+	
+	ARluNonSymStdEig() { }
+	// Short constructor.
+	
+	ARluNonSymStdEig(int nevp, ARumNonSymMatrix<FLOAT, FLOAT>& A,
+		char* whichp = "LM", int ncvp = 0,
+		FLOAT tolp = 0.0, int maxitp = 0,
+		FLOAT* residp = NULL, bool ishiftp = true);
+	// Long constructor (regular mode).
+	
+	ARluNonSymStdEig(int nevp, ARumNonSymMatrix<FLOAT, FLOAT>& A,
+		FLOAT sigma, char* whichp = "LM", int ncvp = 0,
+		FLOAT tolp = 0.0, int maxitp = 0,
+		FLOAT* residp = NULL, bool ishiftp = true);
+	// Long constructor (shift and invert mode).
+	
+	ARluNonSymStdEig(const ARluNonSymStdEig& other) { Copy(other); }
+	// Copy constructor.
+	
+	virtual ~ARluNonSymStdEig() { }
+	// Destructor.
+	
+	// b) Operators.
+	
+	ARluNonSymStdEig& operator=(const ARluNonSymStdEig& other);
+	// Assignment operator.
+	
+}; // class ARluNonSymStdEig.
+
+#endif // ARUSNSYM_H
+\end{cppcode}
+
+\texttt{ARluNonSymStdEig} is derived from \texttt{ARNonSymStdEig}. The new class inherits all functions and variables of this base class. The only function redefined here is \texttt{ChangeShift}. Naturally, the class constructors, the destructor and the assignment operator are not inherited as well.
+
+The main reason for function \texttt{ChangeShift} to be redefined is to include the command
+\begin{verbatim}
+objOP->FactorAsI(sigmaR);
+\end{verbatim}
+This command tells \ARPP{} to factorize matrix $A-\sigma I$ each time a new shift $\sigma$ is defined. This factorization is necessary since \texttt{ARluNonSymStdEig} cannot solve an eigenvalue problem in shift and invert mode without solving several linear systems involving $A-\sigma I$.
+
+In \ARPP{}, every time the copy constructor or the assignment operator is called, a function named copy is called to make a copy of the class. Fortunately, \texttt{ARluNonSymStdEig} does not contain variable declarations, so this function can be inherited from \texttt{ARluNonSymStdEig}. However, if the user intends to create a class that contains new variables, a new \texttt{Copy} function should also be defined. Doing this way, the user assures that neither the copy constructor nor the assignment operator need to be changed.
+
+The standard constructor and the destructor of \texttt{ARluNonSymStdEig} contains no commands. These functions do nothing but calling the constructors and destructors of the base classes. The other three constructors contain exactly the same commands defined in the constructors of the \texttt{ARluNonSymStdEig} class. The same happens to the assignment operator. Actually, these functions were redefined just because the language does not allow them to be inherited.

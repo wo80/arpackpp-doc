@@ -1,0 +1,115 @@
+
+\chapter{Installing and running ARPACK++}\label{installing}
+As a collection of class templates, \ARPP{} can be easily installed, provided that other libraries required by the software are available. This chapter describes how to obtain \ARPP{} and what is necessary to use it.
+
+\section{Obtaining the software}
+
+\ARPP{} is distributed as a single file called \texttt{arpack++.tar.gz}. This file contains all of the library files, some illustrative examples and also a copy of this manual. It can be obtained from the URL: \url{http://www.ime.unicamp.br/~chico/arpack++/}.
+
+Because \ARPP{} is an interface to the original \ARP{} FORTRAN library, this library must be available when installing the c++ code. Although FORTRAN files are not distributed along with \ARPP{}, they can be easily downloaded from Netlib or directly from the URL: \url{http://www.caam.rice.edu/software/ARPACK/}.
+
+The \BLAS{} and \LAP{} routines required by the \ARP{} FORTRAN package are distributed along with the software. Most classes defined by \ARPP{} do not require other routines from these libraries than those distributed with \ARP{} (classes for band and dense matrices are the only exception). However, some examples included in the \ARPP{} "examples" directory will not run without installing the full version of these two packages, so it would be better to assure that no \LAP{} or \BLAS{} routines are missing before compiling the examples.
+
+\LAP{} can be obtained from the URL: \url{http://www.netlib.org/lapack/}. The \BLAS{} is available at: \url{http://www.netlib.org/blas/}. Since \LAP{} includes a subset of the \BLAS{} files, the user must take some care while installing these libraries to avoid code duplication. Moreover, before downloading these libraries, the user should verify if local (optimized) installations of \LAP{} and the \BLAS{} are available. 
+Other libraries required by some (but not all) \ARPP{} classes include SuperLU \cite{T:3}, UMFPACK \cite{T:1} and the Standard Template Library (see \cite{T:8}) packages.
+
+The SuperLU \index{SuperLU} package can be used to solve eigenvalue problems that require complex or real nonsymmetric matrix factorizations. It is called by \texttt{ARluNonSymStdEig}, \texttt{ARluNonSymGenEig}, \texttt{ARluCompStdEig} and \texttt{ARluCompGenEig} classes and must be installed if one of these classes is to be used. SuperLU is available at \url{http://crd-legacy.lbl.gov/\~xiaoye/SuperLU/}
+
+The above mentioned classes can also call UMFPACK library functions instead of using SuperLU to solve eigenvalue problems that require matrix decompositions. However, UMFPACK may be used solely for educational, research, and benchmarking purposes by non-profit organizations and the U.S. government. Commercial and other organizations may make use of UMFPACK only for benchmarking purposes. UMFPACK can be downloaded from ftp://ftp.cis.ufl. edu/pub/umfpack. The MA38 Package in the Harwell Subroutine Library (HSL) has equivalent functionality (and identical calling interface) as UMFPACK and is available for commercial use. Technical reports and information on HSL can be obtained from http://www.cis.rl.ac.uk/struct/ARCD/NUM.html.
+
+The vector class from the Standard Template Library (STL) can be used to retrieve eigenvalues and eigenvectors computed by all \ARPP{} classes. Some compilers include their own version of STL. If it is not the case, the library can also be found at ftp://butler.hpl.hp.com/stl.
+
+\section{Installing ARPACK++}
+
+To unbundle file arpackpp.tar.gz the user should use the following command:
+\begin{verbatim}
+gzip -d arpackpp.tar.gz | tar -xvf -
+\end{verbatim}
+A main directory called \texttt{arpack++} will be automatically created. This directory should contain three other directories. One of them, \texttt{arpack++/include}, concentrates all \ARPP{} templates. Another, \texttt{arpack++/examples}, includes some selected examples, and the last, \texttt{arpack++/doc}, contains installation notes, a description of \ARPP{} structure and a list of known bugs. Finally, some include files used to compile \ARPP{} examples under different platforms can be found in the \texttt{arpack++/makefiles} directory.
+
+\ARPP{} is a collection of templates. Templates are defined in header (.h) files, so they can be used directly by other programs without any previous compilation. No object (.o) or library (.a) files have to be generated when installing \ARPP{}, except those corresponding to other libraries (\ARP{}, \LAP{}, SuperLU and UMFPACK). Some hints on how to properly install these libraries can be found in the \texttt{doc/installation.txt} file.
+
+The main \texttt{arpack++} directory also contains a file, called \texttt{README}, that gives full instructions on how to properly install the library and run the examples.
+
+\ARPP{} header files can be moved to any "include" directory, provided that an option in the form
+\begin{verbatim}
+-I<directory name>
+\end{verbatim}
+
+is added to the command line when compiling programs that use the software, where \texttt{<directory name>} is the name of the include directory.
+
+\section{Compatibility}
+
+At the present time, \ARPP{} has only been compiled with the CC and GNU g++ compilers and tested under Linux and under SUN SparcStation. Further work must be done in order to port the package to other environments.
+
+To minimize this inconvenience, compiler-dependent functions and data types used by \ARPP{} were grouped in a file called \texttt{include/arch.h}. Thus, this file should be changed to reflect the characteristics of the user’s system.
+
+Besides that, a list of known incompatibilities between \ARPP{} and some compilers can be found in \texttt{doc/bugs.txt}.
+
+\paragraph{Declaring complex numbers with the arcomplex class.}
+
+One of the major drawbacks of building mathematical software in c++ is the lack of a standard complex class. Different c++ compilers tend to have different complex classes and most people agree that writing a portable code is almost impossible in such case.
+
+Because of that, \ARPP{} includes its own complex class, called arcomplex, arcomplex is a class template created in an effort to emulate the g++ complex class when other compilers are being used. Both single and double precision complex numbers can be represented by arcomplex, as shown in the following example:
+
+\begin{cppcode}
+#include "arcomp.h"
+
+arcomplex<float>  z;  // A single precision complex number.
+arcomplex<double> w;  // A double precision complex.
+\end{cppcode}
+
+\texttt{arcomplex} is the only complex type referenced by the \ARPP{} files, so it is not necessary to change several files when using a compiler other than g++, but only \texttt{arcomp.h}, the file where \texttt{arcomplex} is defined.
+
+\section{Storage requirements}
+
+The amount of memory required to run \ARPP{} depends on a great number of variables, including the type of the problem, its dimension (\textit{n}), the number desired eigenvalues (\textit{nev}) and the number of Arnoldi vectors generated at each iteration (\textit{ncv}).
+
+The table below furnishes the amount of memory positions used to find eigenvalues and eigenvectors\footnote{The same amount of memory is required to find \textit{nev} Schur vectors or an Arnoldi basis instead of the eigenvectors.} of a standard problem as a function of \textit{n}, \textit{nev} and \textit{ncv}. Since the user is not required to supply \textit{ncv} (this is a optional parameter), the third column of the table indicates the memory required when \textit{ncv} is set to its default value ($2nev+1$).
+
+\begin{center}
+	\renewcommand{\arraystretch}{1.2}
+	$\begin{array}{@{}ccc@{}}\toprule
+	\text{Type of problem} & \text{Memory positions required} & \text{Memory usage with default ncv} \\\midrule
+	\text{Real symmetric} & 4 n + n\cdot ncv + ncv^2 & 5n + 2 n\cdot nev + 4 nev^2\\
+	& +\ 8 ncv + nev &  +\ 21 nev \\\midrule
+	\text{Real nonsymmetric} & 4n + n\cdot ncv + 3ncv^2 & 5n + 2n\cdot nev + 12nev^2\\
+	& +\ 9ncv + 2nev & +\ 32nev\\\midrule
+	\text{Complex} & 8n + 2n\cdot ncv + 6ncv^2 & 10n + 4n\cdot nev + 24nev^2\\
+	& +\ 15ncv + 2nev & +\ 56nev\\\bottomrule
+	\end{array}$
+\end{center}
+
+The table indicates the number of real positions required to solve the related problems. The number of bytes actually used in each case can be obtained by multiplying the value shown in the table by the size (in bytes) of the real element used\footnote{Typical values are: 4 bytes for single precision variables and 8 bytes if double precision is used.}. These values correspond to a problem solved in regular mode. A (small) amount of memory that does not depend on \textit{n}, \textit{ncv} or \textit{nev} is also required to store some other \ARPP{} variables and function parameters, but this memory is negligible for large problems.
+
+If the user wants to determine \textit{nev} eigenvectors and \textit{nev} Schur vectors at the same time, or if he wants to supply his own vector to store the eigenvectors, the storage requirements are increased by $nev\cdot n$ positions in the symmetric case, $nev\cdot n + n$ positions in the nonsymmetric case and $2nev\cdot n$ positions in the complex case.
+
+The values mentioned above do not include the memory required to store the matrices of the problem, nor the LU factors that are generated when a spectral transformation is used. Since the exact number of elements of L and U are hard to determine, the user should also take in account at least an estimate of these additional memory positions required to store the problem data.
+
+\section{Comparing the performance of ARPACK and ARPACK++}
+
+Comparing the performance of \ARP{} and \ARPP{} is not so easy as it might appear, since the libraries are not exactly equivalent.
+
+The first aspect that must be noted is that the FORTRAN version of \ARP{} is not a package that finds eigenvalues at once, but rather a collection of functions that must be called iteratively when solving an eigenvalue problem. This structure is called the \textit{reverse communication interface}.
+
+Since \ARPP{} also includes this interface, the simplest comparison between both versions consists in determining the overhead produced by the c++ structure. This overhead comprises the time spent to declare an eigenvalue problem using one of the classes provided by \ARPP{}, the time required to set the initialize all of the \ARPP{} internal variables and the overhead generated each time a FORTRAN subroutine is called.
+
+Compared this way, both versions have shown the same performance. The difference between \ARP{} and PARPACK++ is insignificant.
+
+Another way to compare the c++ and FORTRAN codes consists in measuring the total time spent by each library to solve an eigenvalue problem. The disadvantage of this type of analysis is that the time consumed by the matrix-vector products (and occasionally some linear systems) required by the Arnoldi method is also considered, which means that not only the performance of \ARP{} and \ARPP{} is compared, but also the ability of the FORTRAN and c++ compilers to optimize the matrix-vector product routine (and sometimes also the linear solver).
+
+In a preliminary test, a very simple set of sample problems that are distributed with \ARP{} was used to compare the performance of both packages. The computations were made on a Sun Workstation, with the f77 (version 3.0.1) and the g++ (version 2.7.2) compilers\footnote{The CC compiler was also tested but it has shown a worse performance when compared to g++.}. The compiler option -O was used in all tests. The dimension of the problem was set to values varying between 100 and 2025. The tests were performed in double precision.
+
+The results obtained suggest that for problems with real variables the performance of \ARP{} and \ARPP{} is very similar. A closer look at the matrix-vector products reveals that they have taken a little more time in c++ than in FORTRAN, but this difference was usually attenuated when considering the total time spent by the Arnoldi method.
+
+On the other hand, problems with complex variables have run much faster in FORTRAN than when compiled with g++. Generally, each matrix-vector product in c++ have taken about 750\% more time than the same product in FORTRAN.
+
+This difference is so great that it suggests that for complex problems the time consumed by the matrix-vector products can dictate the overall performance of the program. This is particularly true for large scale eigenvalue problems.
+
+Perhaps this poor behavior can be imputed to the fact that the c++ language does not contain a intrinsic complex data type as FORTRAN does. Although g++ includes a very attractive class template to define complex variables, the performance of this class is not so good. It has to be verified if better results can be obtained using other c++ compilers.
+
+The matrices of the complex problems tested were very sparse, so the total time spent by the c++ code was 32\% greater than the time consumed by the FORTRAN version of \ARP{}. However, worse results should be expected for matrices that are not so sparse.
+
+\ARPP{} also contains some classes that are capable of performing all of the matrix-vector products (and occasionally solving the linear systems) required to solve an eigenvalue problem, but these classes were not used here, since they are not present in \ARP{}. The comparison was made using the same matrix-vector routine translated to c++ and FORTRAN.
+
+Naturally, some care must be taken before extending these results to other problems. One cannot analyze the behavior of both libraries based only on the results mentioned here, since the total time spent by the Arnoldi method is greatly affected by many factors such as the dimension of the system, the sparsity pattern of the matrices, the number of eigenvalues that are to be calculated, the desired portion of the spectrum and the number of Arnoldi vectors generated at each iteration. Without mentioning that the computer and the compiler used can also affect the measured results. 
