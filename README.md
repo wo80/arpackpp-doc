@@ -16,11 +16,11 @@ The [minted](https://www.ctan.org/pkg/minted) package is used for highlighting s
 
 To build the *Users' Guide* PDF file, use the following commands:
     
-    pdflatex -shell-escape "Users Guide.tex"
+    pdflatex -interaction=nonstopmode -shell-escape "Users Guide.tex"
     bibtex "Users Guide"
     makeindex "Users Guide.idx"
-    pdflatex -shell-escape "Users Guide.tex"
-    pdflatex -shell-escape "Users Guide.tex"
+    pdflatex -interaction=nonstopmode -shell-escape "Users Guide.tex"
+    pdflatex -interaction=nonstopmode -shell-escape "Users Guide.tex"
 
 ## Todo ##
 
@@ -35,9 +35,8 @@ To build the *Users' Guide* PDF file, use the following commands:
 4. Section 1.5 Comparing the performance of ARPACK and ARPACK++:
   * Update with result for modern compilers.
   * Having some kind of benchmark code in the [ARPACK++](https://github.com/m-reuter/arpackpp) GitHub repository would be nice.
-5. Check the bibliography (are the links available, maybe add DOIs, if available).
-6. Add a more complete index.
-7. Remove the reference to "Template Numerical Toolkit (TNT)" in the introduction chapter (it's not used anywhere).
-8. Update all mentions of the "reference guide" or "appendix".
-9. Update all references inside the documentation (text like "see chapter 2" should become pdf links).
-10. Improve title page layout.
+5. Add a more complete index.
+6. Remove the reference to "Template Numerical Toolkit (TNT)" in the introduction chapter (it's not used anywhere).
+7. Update all mentions of the "reference guide" or "appendix".
+8. Update all references inside the documentation (text like "see chapter 2" should become pdf links).
+9. Improve title page layout.
